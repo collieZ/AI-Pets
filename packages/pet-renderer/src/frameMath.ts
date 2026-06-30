@@ -13,8 +13,21 @@ export function getFrameAtTime(
   animation: AnimationDefinition,
   elapsedMs: number
 ): SpriteFrame {
+  if (!Number.isInteger(animation.frames) || animation.frames <= 0) {
+    throw new Error(`无法计算精灵帧：animation.frames 必须是正整数，当前值为 ${animation.frames}。`);
+  }
+
+  if (!Number.isFinite(animation.fps) || animation.fps <= 0) {
+    throw new Error(`无法计算精灵帧：animation.fps 必须是正有限数字，当前值为 ${animation.fps}。`);
+  }
+
+  if (!Number.isFinite(elapsedMs)) {
+    throw new Error(`无法计算精灵帧：elapsedMs 必须是有限数字，当前值为 ${elapsedMs}。`);
+  }
+
+  const safeElapsedMs = Math.max(0, elapsedMs);
   const frameDuration = 1000 / animation.fps;
-  const frameIndex = Math.floor(elapsedMs / frameDuration) % animation.frames;
+  const frameIndex = Math.floor(safeElapsedMs / frameDuration) % animation.frames;
 
   return {
     x: frameIndex * atlas.cellWidth,
