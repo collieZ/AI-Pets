@@ -54,7 +54,7 @@ export function validatePetPackage(pkg: unknown): ValidationResult {
     issues.push({ path: "animationSets.default.animations", message: "必须声明默认动画集合。" });
   }
 
-  if (isObject(states) && isObject(animations)) {
+  if (isObject(states)) {
     for (const [stateId, state] of Object.entries(states)) {
       if (!isObject(state)) {
         issues.push({ path: `states.${stateId}`, message: "状态必须是对象。" });
@@ -65,7 +65,7 @@ export function validatePetPackage(pkg: unknown): ValidationResult {
         issues.push({ path: `states.${stateId}.label`, message: "状态必须有 label。" });
       }
 
-      if (!isNonEmptyString(state.animation) || !Object.hasOwn(animations, state.animation)) {
+      if (isObject(animations) && (!isNonEmptyString(state.animation) || !Object.hasOwn(animations, state.animation))) {
         issues.push({
           path: `states.${stateId}.animation`,
           message: `状态引用的动画 ${String(state.animation)} 不存在。`
