@@ -1,0 +1,22 @@
+{
+  "name": "@ai-pets/web-poc",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@ai-pets/codex-pet-adapter": "workspace:*",
+    "@ai-pets/pet-protocol": "workspace:*",
+    "@ai-pets/pet-renderer": "workspace:*",
+    "@vitejs/plugin-react": "^5.0.0",
+    "vite": "^7.0.0",
+    "typescript": "^5.5.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {}
+}
