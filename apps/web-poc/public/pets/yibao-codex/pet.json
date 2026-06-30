@@ -1,0 +1,19 @@
+{
+  "id": "yibao",
+  "displayName": "\u6021\u5b9d",
+  "description": "\u53ef\u7231\u7684 Q \u7248\u5973\u5b69\u5ba0\u7269\u6021\u5b9d\uff0c\u4f1a\u4eb2\u5207\u5730\u79f0\u547c\u4f60\u4e3a\u4ed9\u8d1d\u3002\u52a8\u4f5c\u5305\u542b\u5f85\u673a\u3001\u5de6\u53f3\u62d6\u62fd\u3001\u6325\u624b\u3001\u8df3\u8dc3\u3001\u5931\u8d25\u6492\u5a07\u3001\u7b49\u5f85\u8f93\u5165\u3001\u8ba4\u771f\u5904\u7406\u4efb\u52a1\u548c review \u68c0\u67e5\u3002",
+  "spritesheetPath": "spritesheet.webp",
+  "nicknameForUser": "\u4ed9\u8d1d",
+  "style": "cute chibi sticker mascot",
+  "interactions": [
+    "idle",
+    "running-right",
+    "running-left",
+    "waving",
+    "jumping",
+    "failed",
+    "waiting",
+    "running",
+    "review"
+  ]
+}
