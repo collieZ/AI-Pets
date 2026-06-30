@@ -12,6 +12,54 @@ export interface CodexPetManifest {
 
 const fallbackInteractions = Object.keys(CODEX_STATE_PRESETS);
 
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+function assertOptionalString(
+  manifest: Record<string, unknown>,
+  field: "displayName" | "description" | "spritesheetPath"
+) {
+  const value = manifest[field];
+  if (value !== undefined && typeof value !== "string") {
+    throw new Error(`Codex 宠物适配失败：${field} 存在时必须是字符串。`);
+  }
+}
+
+function parseCodexPetManifest(rawManifest: unknown): CodexPetManifest {
+  if (!isObject(rawManifest)) {
+    throw new Error("Codex 宠物适配失败：manifest 必须是对象。");
+  }
+
+  if (typeof rawManifest.id !== "string" || rawManifest.id.trim() === "") {
+    throw new Error("Codex 宠物适配失败：id 必须是非空字符串。");
+  }
+
+  assertOptionalString(rawManifest, "displayName");
+  assertOptionalString(rawManifest, "description");
+  assertOptionalString(rawManifest, "spritesheetPath");
+
+  if (
+    rawManifest.interactions !== undefined &&
+    (!Array.isArray(rawManifest.interactions) ||
+      !rawManifest.interactions.every((interaction) => typeof interaction === "string"))
+  ) {
+    throw new Error("Codex 宠物适配失败：interactions 存在时必须是字符串数组。");
+  }
+
+  const displayName = rawManifest.displayName as string | undefined;
+  const description = rawManifest.description as string | undefined;
+  const spritesheetPath = rawManifest.spritesheetPath as string | undefined;
+  const interactions = rawManifest.interactions as string[] | undefined;
+
+  return {
+    id: rawManifest.id,
+    displayName,
+    description,
+    spritesheetPath,
+    interactions
+  };
+}
+
 function buildRenderableStates(interactionIds: string[]) {
   const states: Record<string, PetStateDefinition> = {};
   const skippedStateIds: string[] = [];
@@ -52,7 +100,8 @@ function buildAnimations(states: Record<string, PetStateDefinition>) {
   return animations;
 }
 
-export function adaptCodexPet(manifest: CodexPetManifest): PetPackage {
+export function adaptCodexPet(rawManifest: unknown): PetPackage {
+  const manifest = parseCodexPetManifest(rawManifest);
   const interactionIds = manifest.interactions?.length ? manifest.interactions : fallbackInteractions;
   const { states, skippedStateIds } = buildRenderableStates(interactionIds);
 
