@@ -4,6 +4,7 @@ export type {
   PetInteraction,
   PetPackage,
   PetStateDefinition,
+  KnownSemanticRole,
   SemanticRole,
   ValidationIssue,
   ValidationResult

@@ -9,6 +9,12 @@ const isNonEmptyString = (value: unknown): value is string =>
 const isPositiveInteger = (value: unknown): value is number =>
   typeof value === "number" && Number.isInteger(value) && value > 0;
 
+const isNonNegativeInteger = (value: unknown): value is number =>
+  typeof value === "number" && Number.isInteger(value) && value >= 0;
+
+const isPositiveNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0;
+
 export function validatePetPackage(pkg: unknown): ValidationResult {
   const issues: ValidationIssue[] = [];
 
@@ -31,6 +37,10 @@ export function validatePetPackage(pkg: unknown): ValidationResult {
   if (!isObject(atlas)) {
     issues.push({ path: "assets.atlas", message: "必须声明 spritesheet atlas 资产。" });
   } else {
+    if (atlas.type !== "spritesheet") {
+      issues.push({ path: "assets.atlas.type", message: "atlas.type 必须是 spritesheet。" });
+    }
+
     if (!isNonEmptyString(atlas.path)) {
       issues.push({ path: "assets.atlas.path", message: "atlas.path 必须是非空字符串。" });
     }
@@ -52,6 +62,47 @@ export function validatePetPackage(pkg: unknown): ValidationResult {
   const animations = isObject(defaultAnimationSet) ? defaultAnimationSet.animations : undefined;
   if (!isObject(animations) || Object.keys(animations).length === 0) {
     issues.push({ path: "animationSets.default.animations", message: "必须声明默认动画集合。" });
+  }
+
+  if (isObject(animations)) {
+    for (const [animationId, animation] of Object.entries(animations)) {
+      if (!isObject(animation)) {
+        issues.push({
+          path: `animationSets.default.animations.${animationId}`,
+          message: "动画定义必须是对象。"
+        });
+        continue;
+      }
+
+      if (!isNonNegativeInteger(animation.row)) {
+        issues.push({
+          path: `animationSets.default.animations.${animationId}.row`,
+          message: "row 必须是 0 或更大的整数。"
+        });
+      }
+
+      if (!isPositiveInteger(animation.frames)) {
+        issues.push({
+          path: `animationSets.default.animations.${animationId}.frames`,
+          message: "frames 必须是大于 0 的整数。"
+        });
+      }
+
+      if (!isPositiveNumber(animation.fps)) {
+        issues.push({
+          path: `animationSets.default.animations.${animationId}.fps`,
+          message: "fps 必须是大于 0 的数字。"
+        });
+      }
+    }
+  }
+
+  if (!isObject(pkg.interactions)) {
+    issues.push({ path: "interactions", message: "interactions 必须是对象。" });
+  }
+
+  if (!isObject(pkg.capabilities)) {
+    issues.push({ path: "capabilities", message: "capabilities 必须是对象。" });
   }
 
   if (isObject(states)) {

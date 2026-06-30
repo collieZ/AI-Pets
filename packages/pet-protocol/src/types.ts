@@ -1,4 +1,4 @@
-export type SemanticRole =
+export type KnownSemanticRole =
   | "idle"
   | "moveRight"
   | "moveLeft"
@@ -8,8 +8,9 @@ export type SemanticRole =
   | "waiting"
   | "working"
   | "reviewing"
-  | "thinking"
-  | string;
+  | "thinking";
+
+export type SemanticRole = KnownSemanticRole | (string & {});
 
 export interface AtlasAsset {
   path: string;
