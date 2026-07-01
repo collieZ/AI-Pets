@@ -32,8 +32,8 @@ Codex 宠物包通常包含 `pet.json`、spritesheet 和固定动作列表。适
 
 1. 如果 interaction 声明 `state`，优先使用该状态 id。
 2. 如果没有 `state`，但声明了 `semanticRole`，选择第一个匹配该语义角色的状态。
-3. 如果语义角色没有匹配状态，回退到 `idle`。
-4. 如果 interaction 包含 `say`，同时显示气泡文本。
+3. 如果没有找到可渲染状态，当前解析结果为 `undefined`；Web POC 不切换状态，保持当前动作。
+4. 如果 interaction 包含 `say`，Web POC 仍会显示气泡文本。
 
 这样可以兼容明确动作和语义动作两种调用方式。桌面端或外部 AI 桥接可以只发语义事件，具体表现由宠物包决定。
 
@@ -51,7 +51,7 @@ Codex 9 状态是兼容预设，不是协议限制。当前回退映射为：
 - `running`：处理任务。
 - `review`：检查或 review。
 
-如果 Codex 包缺少某个状态，适配器可以回退到 `idle` 或语义接近的现有状态。生成 manifest 时应保留缺失信息到 `compatibility.codexPet`，方便后续补全。
+如果 Codex 包声明了未知且不可渲染的状态，当前适配器会跳过这些状态，并把状态 id 记录到 `compatibility.codexPet.skippedStateIds`。只有当所有声明状态都无法渲染、生成结果没有任何可用状态时，适配器才会补一个 `idle` 状态，保证 manifest 至少有一个可渲染状态。
 
 ## 已知限制
 

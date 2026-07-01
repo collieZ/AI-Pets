@@ -121,6 +121,7 @@ AI Pet Protocol manifest 是一个 JSON 对象。POC 当前要求 `protocolVersi
 ## interactions
 
 `interactions` 描述宿主事件到状态和气泡文本的映射。
+`interactions` 是必需对象；可以是空对象 `{}`，但不能省略。
 
 ```json
 {
@@ -146,6 +147,7 @@ AI Pet Protocol manifest 是一个 JSON 对象。POC 当前要求 `protocolVersi
 ## capabilities
 
 `capabilities` 是布尔能力表，用于声明宠物包期望宿主支持的能力。
+`capabilities` 是必需对象；可以是空对象 `{}`，但不能省略。
 
 ```json
 {
