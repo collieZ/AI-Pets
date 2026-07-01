@@ -1,19 +1,22 @@
-const { app, BrowserWindow, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, Menu } = require("electron");
 const path = require("node:path");
 
+let mainWindow;
+
 function createMainWindow() {
-  const mainWindow = new BrowserWindow({
-    width: 760,
-    height: 560,
-    minWidth: 420,
-    minHeight: 360,
+  mainWindow = new BrowserWindow({
+    width: 260,
+    height: 340,
+    minWidth: 220,
+    minHeight: 280,
     transparent: true,
     frame: false,
     alwaysOnTop: true,
-    resizable: true,
+    resizable: false,
     show: false,
     backgroundColor: "#00000000",
     webPreferences: {
+      preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true
@@ -33,6 +36,55 @@ function createMainWindow() {
 
   return mainWindow;
 }
+
+ipcMain.handle("desktop:get-window-position", (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (!window) {
+    return { x: 0, y: 0 };
+  }
+
+  const [x, y] = window.getPosition();
+  return { x, y };
+});
+
+ipcMain.handle("desktop:move-window", (event, position) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (!window || typeof position?.x !== "number" || typeof position?.y !== "number") {
+    return;
+  }
+
+  window.setPosition(position.x, position.y, false);
+});
+
+ipcMain.handle("desktop:set-settings-open", (event, open) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (!window) {
+    return;
+  }
+
+  window.setResizable(true);
+  window.setSize(open ? 560 : 260, open ? 420 : 340, false);
+  window.setResizable(false);
+});
+
+ipcMain.handle("desktop:show-context-menu", (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (!window) {
+    return;
+  }
+
+  Menu.buildFromTemplate([
+    {
+      label: "打开/关闭设置",
+      click: () => window.webContents.send("desktop:toggle-settings")
+    },
+    { type: "separator" },
+    {
+      label: "退出 AI-Pets",
+      click: () => app.quit()
+    }
+  ]).popup({ window });
+});
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
