@@ -148,6 +148,30 @@
             "最终回复记录验证命令和结果"
           ],
           "phase": "poc"
+        },
+        {
+          "id": "poc-stabilization-baseline",
+          "title": "固化 POC 稳定化基线",
+          "description": "补齐动画播放、宠物包校验预览和宿主职责边界说明，让 POC 成为后续桌面 MVP 的稳定输入。",
+          "status": "completed",
+          "priority": "high",
+          "dependencies": [
+            "poc-web-playground",
+            "poc-manual-verification"
+          ],
+          "deliverables": [
+            "动画播放与衔接策略",
+            "宠物包校验与预览流程",
+            "协议宿主职责边界",
+            "轻量渲染测试"
+          ],
+          "acceptanceCriteria": [
+            "循环动作持续播放不闪烁",
+            "非循环动作结束后回到 idle",
+            "文档说明 frames 不应包含透明空帧",
+            "Web POC 支持播放速度调整"
+          ],
+          "phase": "poc"
         }
       ]
     },
@@ -158,13 +182,58 @@
       "status": "planned",
       "tasks": [
         {
+          "id": "mvp-ai-driver-protocol",
+          "title": "定义外部 AI 驱动协议草案",
+          "description": "明确外部应用通过本地事件驱动宠物状态、语义角色和气泡文本的最小协议。",
+          "status": "completed",
+          "priority": "high",
+          "dependencies": [
+            "poc-stabilization-baseline"
+          ],
+          "deliverables": [
+            "外部 AI 事件格式",
+            "本地 HTTP 接口草案",
+            "事件解析优先级",
+            "安全边界说明"
+          ],
+          "acceptanceCriteria": [
+            "外部应用不需要理解 spritesheet 渲染细节",
+            "协议支持 interactionId、state、semanticRole 和 say",
+            "默认只面向本机监听"
+          ],
+          "phase": "mvp-desktop"
+        },
+        {
+          "id": "mvp-desktop-tech-choice",
+          "title": "完成桌面 MVP 技术选型",
+          "description": "对比 Tauri 和 Electron，给出桌面 MVP 的首选实现路径和验证清单。",
+          "status": "completed",
+          "priority": "high",
+          "dependencies": [
+            "poc-stabilization-baseline",
+            "mvp-ai-driver-protocol"
+          ],
+          "deliverables": [
+            "Tauri/Electron 对比",
+            "桌面 MVP 推荐方案",
+            "桌面能力验证清单"
+          ],
+          "acceptanceCriteria": [
+            "明确首选 Tauri",
+            "保留 Electron 作为透明窗口受阻时的备选",
+            "列出透明窗口、拖拽、导入、本地事件桥和托盘验证项"
+          ],
+          "phase": "mvp-desktop"
+        },
+        {
           "id": "mvp-desktop-shell",
           "title": "实现 Windows/macOS 独立桌面宠物壳",
           "description": "提供透明置顶窗口、宠物包导入、本地设置和基础运行能力。",
           "status": "planned",
           "priority": "high",
           "dependencies": [
-            "poc"
+            "poc-stabilization-baseline",
+            "mvp-desktop-tech-choice"
           ],
           "deliverables": [
             "透明置顶窗口",
@@ -186,6 +255,7 @@
           "status": "planned",
           "priority": "medium",
           "dependencies": [
+            "mvp-ai-driver-protocol",
             "mvp-desktop-shell"
           ],
           "deliverables": [
