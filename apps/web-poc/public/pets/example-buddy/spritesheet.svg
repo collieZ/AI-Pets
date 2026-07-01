@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="832" viewBox="0 0 1536 832">
+  <rect width="1536" height="832" fill="transparent"/>
+  <defs>
+    <style>
+      .body{stroke:#253047;stroke-width:6}
+      .eye{fill:#253047}
+      .line{stroke:#253047;stroke-width:8;stroke-linecap:round;fill:none}
+    </style>
+  </defs>
+  <g transform="translate(0 0)"><circle class="body" cx="96" cy="104" r="58" fill="#8dd7ff"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/></g>
+  <g transform="translate(192 0)"><circle class="body" cx="96" cy="100" r="58" fill="#8dd7ff"/><circle class="eye" cx="78" cy="88" r="6"/><circle class="eye" cx="114" cy="88" r="6"/></g>
+  <g transform="translate(384 0)"><circle class="body" cx="96" cy="104" r="58" fill="#8dd7ff"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/></g>
+  <g transform="translate(576 0)"><circle class="body" cx="96" cy="108" r="58" fill="#8dd7ff"/><circle class="eye" cx="78" cy="96" r="6"/><circle class="eye" cx="114" cy="96" r="6"/></g>
+  <g transform="translate(768 0)"><circle class="body" cx="96" cy="104" r="58" fill="#8dd7ff"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/></g>
+  <g transform="translate(960 0)"><circle class="body" cx="96" cy="100" r="58" fill="#8dd7ff"/><circle class="eye" cx="78" cy="88" r="6"/><circle class="eye" cx="114" cy="88" r="6"/></g>
+  <g transform="translate(1152 0)"><circle class="body" cx="96" cy="104" r="58" fill="#8dd7ff"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/></g>
+  <g transform="translate(1344 0)"><circle class="body" cx="96" cy="108" r="58" fill="#8dd7ff"/><circle class="eye" cx="78" cy="96" r="6"/><circle class="eye" cx="114" cy="96" r="6"/></g>
+  <g transform="translate(0 208)"><circle class="body" cx="96" cy="104" r="58" fill="#ffd166"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/><path class="line" d="M124 82 L154 58"/></g>
+  <g transform="translate(192 208)"><circle class="body" cx="96" cy="104" r="58" fill="#ffd166"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/><path class="line" d="M124 82 L160 72"/></g>
+  <g transform="translate(384 208)"><circle class="body" cx="96" cy="104" r="58" fill="#ffd166"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/><path class="line" d="M124 82 L154 58"/></g>
+  <g transform="translate(576 208)"><circle class="body" cx="96" cy="104" r="58" fill="#ffd166"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/><path class="line" d="M124 82 L160 72"/></g>
+  <g transform="translate(768 208)"><circle class="body" cx="96" cy="104" r="58" fill="#ffd166"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/><path class="line" d="M124 82 L154 58"/></g>
+  <g transform="translate(960 208)"><circle class="body" cx="96" cy="104" r="58" fill="#ffd166"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/><path class="line" d="M124 82 L160 72"/></g>
+  <g transform="translate(1152 208)"><circle class="body" cx="96" cy="104" r="58" fill="#ffd166"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/><path class="line" d="M124 82 L154 58"/></g>
+  <g transform="translate(1344 208)"><circle class="body" cx="96" cy="104" r="58" fill="#ffd166"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/><path class="line" d="M124 82 L160 72"/></g>
+  <g transform="translate(0 416)"><rect class="body" x="48" y="48" width="96" height="112" rx="32" fill="#95f2c8"/><circle class="eye" cx="78" cy="90" r="6"/><circle class="eye" cx="114" cy="90" r="6"/></g>
+  <g transform="translate(192 416)"><rect class="body" x="52" y="44" width="96" height="112" rx="32" fill="#95f2c8"/><circle class="eye" cx="82" cy="86" r="6"/><circle class="eye" cx="118" cy="86" r="6"/></g>
+  <g transform="translate(384 416)"><rect class="body" x="56" y="48" width="96" height="112" rx="32" fill="#95f2c8"/><circle class="eye" cx="86" cy="90" r="6"/><circle class="eye" cx="122" cy="90" r="6"/></g>
+  <g transform="translate(576 416)"><rect class="body" x="52" y="52" width="96" height="112" rx="32" fill="#95f2c8"/><circle class="eye" cx="82" cy="94" r="6"/><circle class="eye" cx="118" cy="94" r="6"/></g>
+  <g transform="translate(768 416)"><rect class="body" x="48" y="48" width="96" height="112" rx="32" fill="#95f2c8"/><circle class="eye" cx="78" cy="90" r="6"/><circle class="eye" cx="114" cy="90" r="6"/></g>
+  <g transform="translate(960 416)"><rect class="body" x="52" y="44" width="96" height="112" rx="32" fill="#95f2c8"/><circle class="eye" cx="82" cy="86" r="6"/><circle class="eye" cx="118" cy="86" r="6"/></g>
+  <g transform="translate(1152 416)"><rect class="body" x="56" y="48" width="96" height="112" rx="32" fill="#95f2c8"/><circle class="eye" cx="86" cy="90" r="6"/><circle class="eye" cx="122" cy="90" r="6"/></g>
+  <g transform="translate(1344 416)"><rect class="body" x="52" y="52" width="96" height="112" rx="32" fill="#95f2c8"/><circle class="eye" cx="82" cy="94" r="6"/><circle class="eye" cx="118" cy="94" r="6"/></g>
+  <g transform="translate(0 624)"><circle class="body" cx="96" cy="104" r="54" fill="#cdb4ff"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/><text x="96" y="132" text-anchor="middle" font-size="44" fill="#253047">?</text></g>
+  <g transform="translate(192 624)"><circle class="body" cx="96" cy="104" r="54" fill="#cdb4ff"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/><text x="96" y="132" text-anchor="middle" font-size="44" fill="#253047">?</text></g>
+  <g transform="translate(384 624)"><circle class="body" cx="96" cy="104" r="54" fill="#cdb4ff"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/><text x="96" y="132" text-anchor="middle" font-size="44" fill="#253047">?</text></g>
+  <g transform="translate(576 624)"><circle class="body" cx="96" cy="104" r="54" fill="#cdb4ff"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/><text x="96" y="132" text-anchor="middle" font-size="44" fill="#253047">?</text></g>
+  <g transform="translate(768 624)"><circle class="body" cx="96" cy="104" r="54" fill="#cdb4ff"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/><text x="96" y="132" text-anchor="middle" font-size="44" fill="#253047">?</text></g>
+  <g transform="translate(960 624)"><circle class="body" cx="96" cy="104" r="54" fill="#cdb4ff"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/><text x="96" y="132" text-anchor="middle" font-size="44" fill="#253047">?</text></g>
+  <g transform="translate(1152 624)"><circle class="body" cx="96" cy="104" r="54" fill="#cdb4ff"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/><text x="96" y="132" text-anchor="middle" font-size="44" fill="#253047">?</text></g>
+  <g transform="translate(1344 624)"><circle class="body" cx="96" cy="104" r="54" fill="#cdb4ff"/><circle class="eye" cx="78" cy="92" r="6"/><circle class="eye" cx="114" cy="92" r="6"/><text x="96" y="132" text-anchor="middle" font-size="44" fill="#253047">?</text></g>
+</svg>

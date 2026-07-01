@@ -1,0 +1,84 @@
+{
+  "protocolVersion": "0.1.0",
+  "petId": "example-buddy",
+  "displayName": "示例伙伴",
+  "description": "用于验证 AI Pet Protocol 的简洁示例宠物，包含自定义 thinking 状态。",
+  "sourceFormat": "ai-pet-protocol",
+  "assets": {
+    "atlas": {
+      "path": "spritesheet.svg",
+      "type": "spritesheet",
+      "cellWidth": 192,
+      "cellHeight": 208,
+      "columns": 8,
+      "rows": 4
+    }
+  },
+  "states": {
+    "idle": {
+      "label": "待机",
+      "animation": "idle",
+      "semanticRole": "idle",
+      "loop": true
+    },
+    "greet": {
+      "label": "打招呼",
+      "animation": "greet",
+      "semanticRole": "greet",
+      "loop": false
+    },
+    "working": {
+      "label": "工作中",
+      "animation": "working",
+      "semanticRole": "working",
+      "loop": true
+    },
+    "thinking": {
+      "label": "思考中",
+      "animation": "thinking",
+      "semanticRole": "thinking",
+      "loop": true,
+      "custom": true
+    }
+  },
+  "animationSets": {
+    "default": {
+      "animations": {
+        "idle": { "row": 0, "frames": 8, "fps": 6 },
+        "greet": { "row": 1, "frames": 8, "fps": 8 },
+        "working": { "row": 2, "frames": 8, "fps": 10 },
+        "thinking": { "row": 3, "frames": 8, "fps": 5 }
+      }
+    }
+  },
+  "interactions": {
+    "click": {
+      "state": "greet",
+      "say": "你好，我是示例伙伴。"
+    },
+    "aiWorking": {
+      "semanticRole": "working",
+      "say": "正在处理任务..."
+    },
+    "aiThinking": {
+      "state": "thinking",
+      "say": "我想一想。"
+    },
+    "aiDone": {
+      "state": "idle",
+      "say": "完成啦。"
+    }
+  },
+  "capabilities": {
+    "speechBubble": true,
+    "drag": true,
+    "stateMachine": true,
+    "externalEvents": true,
+    "customStates": true
+  },
+  "compatibility": {
+    "codexPet": {
+      "supported": false
+    }
+  }
+}
