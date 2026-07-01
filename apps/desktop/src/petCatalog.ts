@@ -14,19 +14,21 @@ export type PetCatalogItem =
       assetBaseUrl: string;
     };
 
+const assetBase = import.meta.env.BASE_URL;
+
 export const petCatalog: PetCatalogItem[] = [
   {
     id: "example-buddy",
     label: "示例伙伴",
     sourceType: "ai-pet-protocol",
-    manifestUrl: "/pets/example-buddy/manifest.json",
-    assetBaseUrl: "/pets/example-buddy/"
+    manifestUrl: `${assetBase}pets/example-buddy/manifest.json`,
+    assetBaseUrl: `${assetBase}pets/example-buddy/`
   },
   {
     id: "yibao-codex",
     label: "怡宝",
     sourceType: "codex-pet",
-    manifestUrl: "/pets/yibao-codex/pet.json",
-    assetBaseUrl: "/pets/yibao-codex/"
+    manifestUrl: `${assetBase}pets/yibao-codex/pet.json`,
+    assetBaseUrl: `${assetBase}pets/yibao-codex/`
   }
 ];
