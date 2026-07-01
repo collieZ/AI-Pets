@@ -9,5 +9,10 @@ contextBridge.exposeInMainWorld("aiPetsDesktop", {
     const listener = () => callback();
     ipcRenderer.on("desktop:toggle-settings", listener);
     return () => ipcRenderer.removeListener("desktop:toggle-settings", listener);
+  },
+  onSetSettingsOpen: (callback) => {
+    const listener = (_event, open) => callback(Boolean(open));
+    ipcRenderer.on("desktop:set-settings-open", listener);
+    return () => ipcRenderer.removeListener("desktop:set-settings-open", listener);
   }
 });

@@ -35,6 +35,7 @@ declare global {
       setSettingsOpen(open: boolean): Promise<void>;
       showContextMenu(): Promise<void>;
       onToggleSettings(callback: () => void): () => void;
+      onSetSettingsOpen(callback: (open: boolean) => void): () => void;
     };
   }
 }
@@ -102,13 +103,21 @@ export function App() {
   }
 
   useEffect(() => {
-    return window.aiPetsDesktop?.onToggleSettings(() => {
+    const removeToggleListener = window.aiPetsDesktop?.onToggleSettings(() => {
       setSettingsOpen((current) => {
         const nextOpen = !current;
         void window.aiPetsDesktop?.setSettingsOpen(nextOpen);
         return nextOpen;
       });
     });
+    const removeSetListener = window.aiPetsDesktop?.onSetSettingsOpen((open) => {
+      setSettingsOpen(open);
+    });
+
+    return () => {
+      removeToggleListener?.();
+      removeSetListener?.();
+    };
   }, []);
 
   useEffect(() => {
