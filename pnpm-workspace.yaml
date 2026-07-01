@@ -1,5 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+allowBuilds:
+  electron-winstaller: true
 minimumReleaseAgeExclude:
   - electron@43.0.0

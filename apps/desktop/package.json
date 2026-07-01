@@ -2,27 +2,73 @@
   "name": "@ai-pets/desktop",
   "private": true,
   "version": "0.1.0",
+  "description": "AI-Pets 桌面宠物应用",
+  "productName": "AI-Pets",
+  "author": "AI-Pets",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5174",
     "build": "vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "electron:dev": "pnpm build && electron ."
+    "electron:dev": "pnpm build && electron .",
+    "pack:dir": "pnpm build && electron-builder --dir",
+    "dist": "pnpm build && electron-builder",
+    "dist:win": "pnpm build && electron-builder --win nsis",
+    "dist:mac": "pnpm build && electron-builder --mac dmg zip"
   },
-  "dependencies": {
+  "build": {
+    "appId": "cn.aipets.desktop",
+    "productName": "AI-Pets",
+    "asar": true,
+    "npmRebuild": false,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "electron/**",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-${version}-windows-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.productivity",
+      "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
+    }
+  },
+  "dependencies": {},
+  "devDependencies": {
     "@ai-pets/codex-pet-adapter": "workspace:*",
     "@ai-pets/pet-protocol": "workspace:*",
     "@ai-pets/pet-renderer": "workspace:*",
-    "@vitejs/plugin-react": "^5.0.0",
-    "vite": "^7.0.0",
-    "typescript": "^5.5.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "electron": "^43.0.0",
+    "electron-builder": "^26.15.3",
+    "@vitejs/plugin-react": "^5.0.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
-  },
-  "devDependencies": {
-    "electron": "^43.0.0"
+    "react-dom": "^19.0.0",
+    "typescript": "^5.5.0",
+    "vite": "^7.0.0"
   }
 }
