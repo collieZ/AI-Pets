@@ -14,7 +14,9 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "tsc --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --esModuleInterop --allowSyntheticDefaultImports --rootDir . --outDir .tmp/tests --noEmit false tests/node-shims.d.ts tests/renderer.test.ts packages/pet-renderer/src/frameMath.ts packages/codex-pet-adapter/src/codexStates.ts packages/pet-protocol/src/types.ts && node --test .tmp/tests/tests/renderer.test.js",
-    "import:yibao": "node scripts/import-yibao.mjs"
+    "import:yibao": "node scripts/import-yibao.mjs",
+    "clean:node-modules:dry-run": "node scripts/clean-node-modules.mjs --dry-run",
+    "clean:node-modules": "node scripts/clean-node-modules.mjs"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.0.0",
