@@ -1,15 +1,15 @@
 import type { AnimationDefinition, PetStateDefinition } from "@ai-pets/pet-protocol";
 
 export const CODEX_ANIMATION_ROWS: Record<string, AnimationDefinition> = {
-  idle: { row: 0, frames: 6, fps: 8 },
-  "running-right": { row: 1, frames: 8, fps: 12 },
-  "running-left": { row: 2, frames: 8, fps: 12 },
-  waving: { row: 3, frames: 6, fps: 8 },
-  jumping: { row: 4, frames: 8, fps: 12 },
-  failed: { row: 5, frames: 6, fps: 8 },
-  waiting: { row: 6, frames: 6, fps: 8 },
-  running: { row: 7, frames: 8, fps: 12 },
-  review: { row: 8, frames: 6, fps: 8 }
+  idle: { row: 0, frames: 6, fps: 5 },
+  "running-right": { row: 1, frames: 8, fps: 7 },
+  "running-left": { row: 2, frames: 8, fps: 7 },
+  waving: { row: 3, frames: 4, fps: 5 },
+  jumping: { row: 4, frames: 5, fps: 7 },
+  failed: { row: 5, frames: 8, fps: 5 },
+  waiting: { row: 6, frames: 6, fps: 5 },
+  running: { row: 7, frames: 6, fps: 5 },
+  review: { row: 8, frames: 6, fps: 5 }
 };
 
 export const CODEX_STATE_PRESETS: Record<string, PetStateDefinition> = {

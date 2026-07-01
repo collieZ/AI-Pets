@@ -8,10 +8,27 @@ export interface SpriteFrame {
   frameIndex: number;
 }
 
+export interface FramePlaybackOptions {
+  loop?: boolean;
+}
+
+export function getAnimationDurationMs(animation: AnimationDefinition): number {
+  if (!Number.isInteger(animation.frames) || animation.frames <= 0) {
+    throw new Error(`无法计算动画时长：animation.frames 必须是正整数，当前值为 ${animation.frames}。`);
+  }
+
+  if (!Number.isFinite(animation.fps) || animation.fps <= 0) {
+    throw new Error(`无法计算动画时长：animation.fps 必须是正有限数字，当前值为 ${animation.fps}。`);
+  }
+
+  return (animation.frames / animation.fps) * 1000;
+}
+
 export function getFrameAtTime(
   atlas: AtlasAsset,
   animation: AnimationDefinition,
-  elapsedMs: number
+  elapsedMs: number,
+  options: FramePlaybackOptions = {}
 ): SpriteFrame {
   if (!Number.isInteger(animation.frames) || animation.frames <= 0) {
     throw new Error(`无法计算精灵帧：animation.frames 必须是正整数，当前值为 ${animation.frames}。`);
@@ -27,7 +44,11 @@ export function getFrameAtTime(
 
   const safeElapsedMs = Math.max(0, elapsedMs);
   const frameDuration = 1000 / animation.fps;
-  const frameIndex = Math.floor(safeElapsedMs / frameDuration) % animation.frames;
+  const rawFrameIndex = Math.floor(safeElapsedMs / frameDuration);
+  const frameIndex =
+    options.loop === false
+      ? Math.min(animation.frames - 1, rawFrameIndex)
+      : rawFrameIndex % animation.frames;
 
   return {
     x: frameIndex * atlas.cellWidth,

@@ -135,6 +135,10 @@ button:hover {
   color: #172033;
 }
 
+.field input[type="range"] {
+  padding: 0;
+}
+
 .control-group {
   display: grid;
   gap: 10px;

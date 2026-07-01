@@ -1,5 +1,5 @@
 import type { PetPackage, PetStateDefinition, SemanticRole } from "@ai-pets/pet-protocol";
-import { getFrameAtTime } from "./frameMath";
+import { getAnimationDurationMs, getFrameAtTime } from "./frameMath";
 import type { SpriteFrame } from "./frameMath";
 
 export interface RenderableState {
@@ -76,8 +76,8 @@ export function getCurrentFrame(pkg: PetPackage, stateId: string, elapsedMs: num
     throw new Error(`无法渲染状态：状态 ${stateId} 引用的动画 ${state.animation} 不存在。`);
   }
 
-  return getFrameAtTime(pkg.assets.atlas, animation, elapsedMs);
+  return getFrameAtTime(pkg.assets.atlas, animation, elapsedMs, { loop: state.loop });
 }
 
-export { getFrameAtTime };
+export { getAnimationDurationMs, getFrameAtTime };
 export type { SpriteFrame };

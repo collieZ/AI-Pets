@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { adaptCodexPet } from "@ai-pets/codex-pet-adapter";
 import { validatePetPackage, type PetPackage } from "@ai-pets/pet-protocol";
 import {
+  getAnimationDurationMs,
   getCurrentFrame,
   listRenderableStates,
   resolveInteractionState,
@@ -43,6 +44,18 @@ function findMovementState(states: RenderableState[], deltaX: number) {
   return states.find((state) => state.semanticRole === role);
 }
 
+function findIdleStateId(states: RenderableState[]) {
+  return states.find((state) => state.semanticRole === "idle")?.id ?? states[0]?.id ?? "";
+}
+
+function clampPlaybackSpeed(value: number) {
+  if (!Number.isFinite(value)) {
+    return 1;
+  }
+
+  return Math.max(0.5, Math.min(1.5, value));
+}
+
 export function App() {
   const [selectedId, setSelectedId] = useState(petCatalog[0]?.id ?? "");
   const [pkg, setPkg] = useState<PetPackage | null>(null);
@@ -51,6 +64,7 @@ export function App() {
   const [activeState, setActiveState] = useState("");
   const [message, setMessage] = useState(defaultMessage);
   const [elapsed, setElapsed] = useState(0);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -59,17 +73,27 @@ export function App() {
   const selected = petCatalog.find((item) => item.id === selectedId);
   const states = useMemo(() => (pkg ? listRenderableStates(pkg) : []), [pkg]);
   const activeRenderableState = states.find((state) => state.id === activeState);
+  const effectiveElapsed = elapsed * playbackSpeed;
   const frame = useMemo<SpriteFrame | null>(() => {
     if (!pkg || !activeState) {
       return null;
     }
 
     try {
-      return getCurrentFrame(pkg, activeState, elapsed);
+      return getCurrentFrame(pkg, activeState, effectiveElapsed);
     } catch {
       return null;
     }
-  }, [activeState, elapsed, pkg]);
+  }, [activeState, effectiveElapsed, pkg]);
+
+  function switchState(nextStateId: string) {
+    setElapsed(0);
+    setActiveState(nextStateId);
+  }
+
+  function updatePlaybackSpeed(value: number) {
+    setPlaybackSpeed(clampPlaybackSpeed(value));
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -104,7 +128,7 @@ export function App() {
           const typedPackage = nextPkg as PetPackage;
           const firstState = listRenderableStates(typedPackage)[0]?.id ?? "";
           setPkg(typedPackage);
-          setActiveState(firstState);
+          switchState(firstState);
           setMessage(defaultMessage);
           setLoadState("ready");
         }
@@ -124,6 +148,8 @@ export function App() {
   }, [selected]);
 
   useEffect(() => {
+    setElapsed(0);
+
     const started = performance.now();
     let raf = 0;
 
@@ -136,6 +162,35 @@ export function App() {
     return () => cancelAnimationFrame(raf);
   }, [activeState]);
 
+  useEffect(() => {
+    if (!pkg || !activeState || playbackSpeed <= 0) {
+      return;
+    }
+
+    const state = pkg.states[activeState];
+    if (!state || state.loop) {
+      return;
+    }
+
+    const idleStateId = findIdleStateId(states);
+    if (!idleStateId || idleStateId === activeState) {
+      return;
+    }
+
+    const animation = pkg.animationSets.default.animations[state.animation];
+    if (!animation) {
+      return;
+    }
+
+    const timeoutMs = getAnimationDurationMs(animation) / playbackSpeed;
+    const timeout = window.setTimeout(() => {
+      setElapsed(0);
+      setActiveState((currentState) => (currentState === activeState ? idleStateId : currentState));
+    }, timeoutMs);
+
+    return () => window.clearTimeout(timeout);
+  }, [activeState, pkg, playbackSpeed, states]);
+
   function triggerInteraction(interactionId: string) {
     if (!pkg) {
       return;
@@ -143,7 +198,7 @@ export function App() {
 
     const nextState = resolveInteractionState(pkg, interactionId);
     if (nextState) {
-      setActiveState(nextState.id);
+      switchState(nextState.id);
     }
 
     const say = pkg.interactions[interactionId]?.say;
@@ -182,8 +237,8 @@ export function App() {
     });
 
     const movementState = findMovementState(states, deltaX);
-    if (movementState && Math.abs(deltaX) > 12) {
-      setActiveState(movementState.id);
+    if (movementState && movementState.id !== activeState && Math.abs(deltaX) > 12) {
+      switchState(movementState.id);
     }
   }
 
@@ -283,7 +338,7 @@ export function App() {
                 className={state.id === activeState ? "active" : ""}
                 key={state.id}
                 type="button"
-                onClick={() => setActiveState(state.id)}
+                onClick={() => switchState(state.id)}
               >
                 {state.label}
                 {state.custom ? "（自定义）" : ""}
@@ -291,6 +346,34 @@ export function App() {
             ))}
           </div>
           {loadState === "ready" && states.length === 0 && <p className="muted">没有可渲染状态。</p>}
+        </section>
+
+        <section className="control-group">
+          <h2>播放设置</h2>
+          <label className="field">
+            <span>播放速度：{playbackSpeed.toFixed(2)}x</span>
+            <input
+              max="1.5"
+              min="0.5"
+              onChange={(event) => updatePlaybackSpeed(Number(event.target.value))}
+              onInput={(event) => updatePlaybackSpeed(Number(event.currentTarget.value))}
+              step="0.05"
+              type="range"
+              value={playbackSpeed}
+            />
+          </label>
+          <label className="field">
+            <span>速度数值</span>
+            <input
+              max="1.5"
+              min="0.5"
+              onChange={(event) => updatePlaybackSpeed(Number(event.target.value))}
+              step="0.05"
+              type="number"
+              value={playbackSpeed}
+            />
+          </label>
+          <p className="muted">默认节奏由宠物包 fps 决定；这里用于临时放慢或加快验证效果。</p>
         </section>
 
         <section className="control-group">
