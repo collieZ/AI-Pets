@@ -206,7 +206,7 @@
         {
           "id": "mvp-desktop-tech-choice",
           "title": "完成桌面 MVP 技术选型",
-          "description": "对比 Tauri 和 Electron，给出桌面 MVP 的首选实现路径和验证清单。",
+          "description": "确定桌面 MVP 采用 Electron，并给出首选实现路径和验证清单。",
           "status": "completed",
           "priority": "high",
           "dependencies": [
@@ -214,13 +214,13 @@
             "mvp-ai-driver-protocol"
           ],
           "deliverables": [
-            "Tauri/Electron 对比",
+            "Electron 桌面壳方案",
             "桌面 MVP 推荐方案",
             "桌面能力验证清单"
           ],
           "acceptanceCriteria": [
-            "明确首选 Tauri",
-            "保留 Electron 作为透明窗口受阻时的备选",
+            "明确首选 Electron",
+            "当前阶段实现方向只保留 Electron",
             "列出透明窗口、拖拽、导入、本地事件桥和托盘验证项"
           ],
           "phase": "mvp-desktop"
