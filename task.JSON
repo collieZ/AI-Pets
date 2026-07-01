@@ -1,0 +1,250 @@
+{
+  "project": "AI-Pets",
+  "language": "zh-CN",
+  "phases": [
+    {
+      "id": "poc",
+      "title": "POC 验证阶段",
+      "description": "完成 AI Pet Protocol、动态渲染、Codex/yibao 兼容适配、Web POC、项目内 skill 与中文文档，并执行最终静态验证。",
+      "status": "in_progress",
+      "tasks": [
+        {
+          "id": "poc-protocol-v0",
+          "title": "定义 AI Pet Protocol v0",
+          "description": "建立宠物包的通用协议，让状态、动画、交互和能力声明都由 manifest 驱动。",
+          "status": "planned",
+          "priority": "high",
+          "dependencies": [],
+          "deliverables": [
+            "协议类型定义",
+            "宠物包校验逻辑",
+            "中文协议文档"
+          ],
+          "acceptanceCriteria": [
+            "支持自定义动作状态",
+            "状态入口从宠物包动态生成",
+            "协议文档解释 protocolVersion、assets、states、animations、interactions、capabilities 和 compatibility"
+          ]
+        },
+        {
+          "id": "poc-renderer",
+          "title": "实现动态状态渲染器",
+          "description": "根据宠物包声明计算当前帧、列出可渲染状态，并解析交互事件到状态。",
+          "status": "planned",
+          "priority": "high",
+          "dependencies": [
+            "poc-protocol-v0"
+          ],
+          "deliverables": [
+            "帧计算工具",
+            "可渲染状态列表",
+            "交互事件解析"
+          ],
+          "acceptanceCriteria": [
+            "渲染器不写死 Codex 9 状态",
+            "可根据 manifest states 输出状态列表",
+            "支持按 state id 或 semanticRole 解析交互"
+          ]
+        },
+        {
+          "id": "poc-codex-yibao-adapter",
+          "title": "适配 Codex 宠物和 yibao 验证包",
+          "description": "将 Codex 宠物包包装为 AI Pet Protocol 兼容宠物，并导入本机 yibao 资源用于 POC 验证。",
+          "status": "planned",
+          "priority": "high",
+          "dependencies": [
+            "poc-protocol-v0"
+          ],
+          "deliverables": [
+            "Codex 状态映射",
+            "Codex/yibao 适配函数",
+            "yibao 导入脚本",
+            "yibao 静态验证资源"
+          ],
+          "acceptanceCriteria": [
+            "优先读取 Codex pet.json 的 interactions 字段",
+            "缺失 interactions 时回退 Codex 9 状态",
+            "导入脚本复制 pet.json 和 spritesheet.webp 到 Web POC 公共资源目录"
+          ]
+        },
+        {
+          "id": "poc-web-playground",
+          "title": "实现 Web POC 验证台",
+          "description": "提供可视化验证界面，用于切换宠物包、触发状态和模拟 AI 事件。",
+          "status": "planned",
+          "priority": "high",
+          "dependencies": [
+            "poc-protocol-v0",
+            "poc-renderer",
+            "poc-codex-yibao-adapter"
+          ],
+          "deliverables": [
+            "宠物包选择器",
+            "动态状态按钮",
+            "AI 事件按钮",
+            "气泡文本输入",
+            "调试面板",
+            "example-buddy 示例宠物包"
+          ],
+          "acceptanceCriteria": [
+            "example-buddy 可以加载",
+            "example-buddy 显示自定义 thinking 状态",
+            "yibao-codex 可以加载",
+            "状态按钮来自宠物包声明而不是 UI 写死"
+          ]
+        },
+        {
+          "id": "poc-skill-docs",
+          "title": "创建项目内 skill 和中文文档",
+          "description": "沉淀宠物创建流程、协议说明、Web POC 使用说明、Codex 适配说明和后续路线图。",
+          "status": "planned",
+          "priority": "medium",
+          "dependencies": [
+            "poc-protocol-v0",
+            "poc-web-playground"
+          ],
+          "deliverables": [
+            "skills/ai-pet-creator/SKILL.md",
+            "协议文档",
+            "Web POC 文档",
+            "Codex 适配器文档",
+            "桌面 MVP 路线图",
+            "硬件产品路线图"
+          ],
+          "acceptanceCriteria": [
+            "skill 位于项目内",
+            "中文文档解释自定义动作状态",
+            "文档包含 yibao 验证方式",
+            "路线图覆盖桌面壳、事件桥、硬件运行时和内容更新方向"
+          ]
+        },
+        {
+          "id": "poc-manual-verification",
+          "title": "执行 POC 手动验证",
+          "description": "在静态验证通过后，由人工打开 Web POC 完成最终浏览器验证。",
+          "status": "planned",
+          "priority": "medium",
+          "dependencies": [
+            "poc-web-playground",
+            "poc-skill-docs"
+          ],
+          "deliverables": [
+            "类型检查结果",
+            "构建结果",
+            "task.JSON 解析结果",
+            "yibao 导入结果",
+            "Web POC 手动验证记录"
+          ],
+          "acceptanceCriteria": [
+            "pnpm typecheck 通过",
+            "pnpm build 通过",
+            "task.JSON 可以被 JSON.parse 解析",
+            "pnpm import:yibao 通过",
+            "最终回复记录验证命令和结果"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mvp-desktop",
+      "title": "桌面 MVP 阶段",
+      "description": "把 POC 能力推进到 Windows/macOS 桌面宠物应用，并建立外部 AI 应用事件桥。",
+      "status": "planned",
+      "tasks": [
+        {
+          "id": "mvp-desktop-shell",
+          "title": "实现 Windows/macOS 独立桌面宠物壳",
+          "description": "提供透明置顶窗口、宠物包导入、本地设置和基础运行能力。",
+          "status": "planned",
+          "priority": "high",
+          "dependencies": [
+            "poc"
+          ],
+          "deliverables": [
+            "透明置顶窗口",
+            "宠物包导入流程",
+            "本地设置",
+            "桌面端渲染运行时"
+          ],
+          "acceptanceCriteria": [
+            "桌面端消费 AI Pet Protocol 宠物包",
+            "桌面端不依赖 Web POC 内部实现",
+            "Windows 和 macOS 方向都有明确打包方案"
+          ]
+        },
+        {
+          "id": "mvp-ai-event-bridge",
+          "title": "实现外部 AI 应用事件桥接",
+          "description": "让外部 AI 应用可以通过本地接口驱动宠物状态、语义事件和气泡文本。",
+          "status": "planned",
+          "priority": "medium",
+          "dependencies": [
+            "mvp-desktop-shell"
+          ],
+          "deliverables": [
+            "本地事件 API",
+            "状态触发协议",
+            "气泡文本接口",
+            "事件安全边界说明"
+          ],
+          "acceptanceCriteria": [
+            "外部应用能通过状态 id 驱动宠物",
+            "外部应用能通过 semanticRole 驱动宠物",
+            "事件桥不会要求外部应用理解渲染器内部实现"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hardware-product",
+      "title": "硬件产品阶段",
+      "description": "探索把 AI-Pets 协议和内容体系迁移到受限硬件设备上的产品化路径。",
+      "status": "planned",
+      "tasks": [
+        {
+          "id": "hardware-runtime-architecture",
+          "title": "设计硬件显示运行架构",
+          "description": "定义硬件端显示、渲染、资源格式、输入传感器和受限运行时的架构边界。",
+          "status": "planned",
+          "priority": "medium",
+          "dependencies": [
+            "poc"
+          ],
+          "deliverables": [
+            "显示渲染方案",
+            "受限设备资源格式",
+            "输入传感器方案",
+            "硬件运行时架构说明"
+          ],
+          "acceptanceCriteria": [
+            "硬件端保留 manifest 和状态语义",
+            "明确 spritesheet 或预编译资源格式取舍",
+            "说明受限设备上的帧率、内存和功耗约束"
+          ]
+        },
+        {
+          "id": "hardware-llm-connectivity",
+          "title": "设计硬件大模型连接和内容更新方案",
+          "description": "规划硬件设备如何连接 LLM 服务、处理离线/联网边界，并更新宠物内容。",
+          "status": "planned",
+          "priority": "medium",
+          "dependencies": [
+            "hardware-runtime-architecture"
+          ],
+          "deliverables": [
+            "LLM 连接方案",
+            "离线能力边界",
+            "联网能力边界",
+            "OTA 策略",
+            "内容更新策略"
+          ],
+          "acceptanceCriteria": [
+            "支持语义化宠物事件",
+            "说明离线和联网能力边界",
+            "内容更新能覆盖 manifest、资源和安全回滚"
+          ]
+        }
+      ]
+    }
+  ]
+}
