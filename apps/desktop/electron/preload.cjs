@@ -1,18 +1,22 @@
-const { contextBridge, ipcRenderer } = require("electron");
+﻿const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("aiPetsDesktop", {
   getWindowPosition: () => ipcRenderer.invoke("desktop:get-window-position"),
   moveWindow: (position) => ipcRenderer.invoke("desktop:move-window", position),
   setSettingsOpen: (open) => ipcRenderer.invoke("desktop:set-settings-open", open),
+  setPetVisible: (visible) => ipcRenderer.invoke("desktop:set-pet-visible", visible),
+  setAlwaysOnTop: (enabled) => ipcRenderer.invoke("desktop:set-always-on-top", enabled),
+  getDesktopState: () => ipcRenderer.invoke("desktop:get-state"),
+  dispatchPetCommand: (command) => ipcRenderer.invoke("desktop:dispatch-pet-command", command),
   showContextMenu: () => ipcRenderer.invoke("desktop:show-context-menu"),
-  onToggleSettings: (callback) => {
-    const listener = () => callback();
-    ipcRenderer.on("desktop:toggle-settings", listener);
-    return () => ipcRenderer.removeListener("desktop:toggle-settings", listener);
+  onDesktopState: (callback) => {
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on("desktop:state", listener);
+    return () => ipcRenderer.removeListener("desktop:state", listener);
   },
-  onSetSettingsOpen: (callback) => {
-    const listener = (_event, open) => callback(Boolean(open));
-    ipcRenderer.on("desktop:set-settings-open", listener);
-    return () => ipcRenderer.removeListener("desktop:set-settings-open", listener);
+  onPetCommand: (callback) => {
+    const listener = (_event, command) => callback(command);
+    ipcRenderer.on("desktop:pet-command", listener);
+    return () => ipcRenderer.removeListener("desktop:pet-command", listener);
   }
 });

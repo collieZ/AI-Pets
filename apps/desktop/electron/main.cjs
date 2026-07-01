@@ -1,13 +1,30 @@
 const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage } = require("electron");
+const fs = require("node:fs");
 const path = require("node:path");
 
-let mainWindow;
+let petWindow;
+let settingsWindow;
 let tray;
 let settingsOpen = false;
+let petVisible = true;
 let alwaysOnTop = true;
 
-function createMainWindow() {
-  mainWindow = new BrowserWindow({
+function getAppEntry() {
+  return path.join(__dirname, "..", "dist", "index.html");
+}
+
+function loadAppView(window, view) {
+  const devUrl = process.env.AI_PETS_DESKTOP_DEV_URL;
+  if (devUrl) {
+    void window.loadURL(`${devUrl}?view=${view}`);
+    return;
+  }
+
+  void window.loadFile(getAppEntry(), { query: { view } });
+}
+
+function createPetWindow() {
+  petWindow = new BrowserWindow({
     width: 260,
     height: 340,
     minWidth: 220,
@@ -26,37 +43,124 @@ function createMainWindow() {
     }
   });
 
-  mainWindow.once("ready-to-show", () => {
-    mainWindow.show();
+  petWindow.once("ready-to-show", () => {
+    petVisible = true;
+    petWindow.show();
+    broadcastDesktopState();
   });
 
-  mainWindow.on("closed", () => {
-    mainWindow = undefined;
+  petWindow.on("show", () => {
+    petVisible = true;
+    updateTrayMenu();
+    broadcastDesktopState();
   });
 
-  const devUrl = process.env.AI_PETS_DESKTOP_DEV_URL;
-  if (devUrl) {
-    void mainWindow.loadURL(devUrl);
-  } else {
-    void mainWindow.loadFile(path.join(__dirname, "..", "dist", "index.html"));
-  }
+  petWindow.on("hide", () => {
+    petVisible = false;
+    updateTrayMenu();
+    broadcastDesktopState();
+  });
 
-  return mainWindow;
+  petWindow.on("closed", () => {
+    petWindow = undefined;
+    petVisible = false;
+    updateTrayMenu();
+    broadcastDesktopState();
+  });
+
+  loadAppView(petWindow, "pet");
+  return petWindow;
 }
 
-function getOrCreateMainWindow() {
-  return mainWindow && !mainWindow.isDestroyed() ? mainWindow : createMainWindow();
+function createSettingsWindow() {
+  settingsWindow = new BrowserWindow({
+    width: 780,
+    height: 580,
+    minWidth: 680,
+    minHeight: 500,
+    title: "AI-Pets 设置",
+    show: false,
+    backgroundColor: "#f5f7fb",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  });
+
+  settingsWindow.once("ready-to-show", () => {
+    if (settingsOpen) {
+      settingsWindow.show();
+    }
+  });
+
+  settingsWindow.on("close", (event) => {
+    if (app.isQuitting) {
+      return;
+    }
+
+    event.preventDefault();
+    setSettingsOpen(false);
+  });
+
+  settingsWindow.on("show", () => {
+    settingsOpen = true;
+    updateTrayMenu();
+    broadcastDesktopState();
+  });
+
+  settingsWindow.on("hide", () => {
+    settingsOpen = false;
+    updateTrayMenu();
+    broadcastDesktopState();
+  });
+
+  settingsWindow.on("closed", () => {
+    settingsWindow = undefined;
+    settingsOpen = false;
+    updateTrayMenu();
+    broadcastDesktopState();
+  });
+
+  loadAppView(settingsWindow, "settings");
+  return settingsWindow;
+}
+
+function getOrCreatePetWindow() {
+  return petWindow && !petWindow.isDestroyed() ? petWindow : createPetWindow();
+}
+
+function getOrCreateSettingsWindow() {
+  return settingsWindow && !settingsWindow.isDestroyed() ? settingsWindow : createSettingsWindow();
+}
+
+function getDesktopState() {
+  return {
+    settingsOpen,
+    petVisible,
+    alwaysOnTop
+  };
+}
+
+function broadcastDesktopState() {
+  const state = getDesktopState();
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send("desktop:state", state);
+  }
 }
 
 function setSettingsOpen(open) {
-  const window = getOrCreateMainWindow();
   settingsOpen = Boolean(open);
-  window.setResizable(true);
-  window.setSize(settingsOpen ? 560 : 260, settingsOpen ? 420 : 340, false);
-  window.setResizable(false);
-  window.show();
-  window.webContents.send("desktop:set-settings-open", settingsOpen);
+  const window = getOrCreateSettingsWindow();
+  if (settingsOpen) {
+    window.show();
+    window.focus();
+  } else {
+    window.hide();
+  }
   updateTrayMenu();
+  broadcastDesktopState();
 }
 
 function toggleSettings() {
@@ -64,29 +168,58 @@ function toggleSettings() {
 }
 
 function setPetVisible(visible) {
-  const window = getOrCreateMainWindow();
-  if (visible) {
+  petVisible = Boolean(visible);
+  const window = getOrCreatePetWindow();
+  if (petVisible) {
     window.show();
     window.focus();
   } else {
     window.hide();
   }
   updateTrayMenu();
+  broadcastDesktopState();
 }
 
 function togglePetVisible() {
-  const window = getOrCreateMainWindow();
+  const window = getOrCreatePetWindow();
   setPetVisible(!window.isVisible());
 }
 
 function setAlwaysOnTop(enabled) {
   alwaysOnTop = Boolean(enabled);
-  const window = getOrCreateMainWindow();
+  const window = getOrCreatePetWindow();
   window.setAlwaysOnTop(alwaysOnTop);
   updateTrayMenu();
+  broadcastDesktopState();
+}
+
+function dispatchPetCommand(command) {
+  const window = getOrCreatePetWindow();
+  if (!window.isVisible()) {
+    window.show();
+  }
+  window.webContents.send("desktop:pet-command", command);
+}
+
+function getTrayIconPath() {
+  const candidates = [
+    path.join(process.resourcesPath, "assets", "tray.ico"),
+    path.join(process.resourcesPath, "assets", "tray.png"),
+    path.join(__dirname, "..", "assets", "tray.ico"),
+    path.join(__dirname, "..", "assets", "tray.png")
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate));
 }
 
 function createTrayIcon() {
+  const iconPath = getTrayIconPath();
+  if (iconPath) {
+    const image = nativeImage.createFromPath(iconPath);
+    if (!image.isEmpty()) {
+      return image.resize({ width: 16, height: 16 });
+    }
+  }
+
   return nativeImage.createFromDataURL(
     "data:image/svg+xml;utf8," +
       encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
@@ -98,26 +231,29 @@ function createTrayIcon() {
   );
 }
 
-function buildDesktopMenu(window) {
+function buildDesktopMenu() {
   return Menu.buildFromTemplate([
     {
-      label: settingsOpen ? "\u5173\u95ed\u8bbe\u7f6e" : "\u6253\u5f00\u8bbe\u7f6e",
+      label: settingsOpen ? "关闭设置" : "打开设置",
       click: toggleSettings
     },
     {
-      label: window?.isVisible() ? "\u9690\u85cf\u5ba0\u7269" : "\u663e\u793a\u5ba0\u7269",
+      label: petVisible ? "隐藏宠物" : "显示宠物",
       click: togglePetVisible
     },
     {
-      label: "\u7a97\u53e3\u7f6e\u9876",
+      label: "窗口置顶",
       type: "checkbox",
       checked: alwaysOnTop,
       click: (item) => setAlwaysOnTop(item.checked)
     },
     { type: "separator" },
     {
-      label: "\u9000\u51fa AI-Pets",
-      click: () => app.quit()
+      label: "退出 AI-Pets",
+      click: () => {
+        app.isQuitting = true;
+        app.quit();
+      }
     }
   ]);
 }
@@ -127,8 +263,7 @@ function updateTrayMenu() {
     return;
   }
 
-  const window = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
-  tray.setContextMenu(buildDesktopMenu(window));
+  tray.setContextMenu(buildDesktopMenu());
 }
 
 function createTray() {
@@ -161,23 +296,37 @@ ipcMain.handle("desktop:set-settings-open", (_event, open) => {
   setSettingsOpen(open);
 });
 
+ipcMain.handle("desktop:set-pet-visible", (_event, visible) => {
+  setPetVisible(visible);
+});
+
+ipcMain.handle("desktop:set-always-on-top", (_event, enabled) => {
+  setAlwaysOnTop(enabled);
+});
+
+ipcMain.handle("desktop:get-state", () => getDesktopState());
+
+ipcMain.handle("desktop:dispatch-pet-command", (_event, command) => {
+  dispatchPetCommand(command);
+});
+
 ipcMain.handle("desktop:show-context-menu", (event) => {
   const window = BrowserWindow.fromWebContents(event.sender);
   if (!window) {
     return;
   }
 
-  buildDesktopMenu(window).popup({ window });
+  buildDesktopMenu().popup({ window });
 });
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
-  createMainWindow();
+  createPetWindow();
   createTray();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow();
+      createPetWindow();
     } else {
       setPetVisible(true);
     }
