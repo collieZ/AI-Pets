@@ -45,6 +45,10 @@ type ImportPetFolderResult =
   | { ok: false; reason: "already-exists"; petId: string }
   | { ok: false; reason: "cancelled" | "no-pending-import" };
 
+type DeleteImportedPetResult =
+  | { ok: true; petId: string }
+  | { ok: false; reason: "not-found"; petId: string };
+
 declare global {
   interface Window {
     aiPetsDesktop?: {
@@ -58,6 +62,7 @@ declare global {
       listImportedPets(): Promise<PetCatalogItem[]>;
       selectImportPetFolder(): Promise<ImportPetFolderResult>;
       confirmImportPetFolderOverwrite(petId: string): Promise<ImportPetFolderResult>;
+      deleteImportedPet(petId: string): Promise<DeleteImportedPetResult>;
       showContextMenu(): Promise<void>;
       invalidatePetWindow(): Promise<void>;
       onDesktopState(callback: (state: DesktopState) => void): () => void;
@@ -85,6 +90,17 @@ function joinAssetUrl(selected: PetCatalogItem, pkg: PetPackage) {
 function getValidationMessage(pkg: unknown) {
   const result = validatePetPackage(pkg);
   return result.ok ? "" : result.issues.map((issue) => `${issue.path}: ${issue.message}`).join("\n");
+}
+
+function getPetLoadErrorMessage(caught: unknown, selected: PetCatalogItem) {
+  const rawMessage = caught instanceof Error ? caught.message : String(caught);
+  if (rawMessage === "Failed to fetch" && selected.manifestUrl.startsWith("ai-pets://")) {
+    return "无法读取导入宠物资源。请完全重启应用后重试；如果仍失败，请检查导入目录中的 pet.json/manifest.json 和 spritesheet 是否完整。";
+  }
+  if (rawMessage === "Failed to fetch") {
+    return `无法读取宠物 manifest：${selected.manifestUrl}`;
+  }
+  return rawMessage;
 }
 
 function findIdleStateId(states: RenderableState[]) {
@@ -183,7 +199,7 @@ function usePetPackage(catalog: PetCatalogItem[], selectedId: string) {
       } catch (caught) {
         if (!cancelled) {
           setLoadState("error");
-          setError(caught instanceof Error ? caught.message : String(caught));
+          setError(getPetLoadErrorMessage(caught, selected));
         }
       }
     }
@@ -581,6 +597,7 @@ function SettingsView() {
   const [importing, setImporting] = useState(false);
   const [importMessage, setImportMessage] = useState("");
   const [importError, setImportError] = useState("");
+  const selectedIsImported = selected?.manifestUrl.startsWith("ai-pets://imported-pets/") ?? false;
 
   function dispatch(command: PetCommand) {
     void window.aiPetsDesktop?.dispatchPetCommand(command);
@@ -642,6 +659,36 @@ function SettingsView() {
       setImportError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setImporting(false);
+    }
+  }
+
+  async function deleteSelectedImportedPet() {
+    if (!window.aiPetsDesktop || !selected || !selectedIsImported) {
+      return;
+    }
+
+    const shouldDelete = window.confirm(`确定删除导入宠物「${selected.label}」吗？这会删除应用管理目录中的副本。`);
+    if (!shouldDelete) {
+      return;
+    }
+
+    setImportMessage("");
+    setImportError("");
+
+    try {
+      const result = await window.aiPetsDesktop.deleteImportedPet(selected.id);
+      if (result.ok) {
+        const fallbackPetId = getInitialPetId(petCatalog);
+        if (fallbackPetId) {
+          selectPet(fallbackPetId);
+        }
+        setImportMessage(`已删除导入宠物：${selected.label}`);
+        return;
+      }
+
+      setImportError("未找到要删除的导入宠物，列表已刷新。");
+    } catch (caught) {
+      setImportError(caught instanceof Error ? caught.message : String(caught));
     }
   }
 
@@ -756,6 +803,11 @@ function SettingsView() {
               </label>
               {loadState === "error" && <p className="error-text">{error}</p>}
               {loadState === "ready" && <p className="muted">已加载：{selected?.label}</p>}
+              {selectedIsImported && (
+                <button className="danger-button" onClick={() => void deleteSelectedImportedPet()} type="button">
+                  删除当前导入宠物
+                </button>
+              )}
             </div>
 
             <div className="setting-card">

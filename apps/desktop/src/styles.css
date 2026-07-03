@@ -46,6 +46,16 @@ button:disabled {
   opacity: 0.58;
 }
 
+.danger-button {
+  border-color: #fecaca;
+  background: #fff5f5;
+  color: #9b1c1c;
+}
+
+.danger-button:hover:not(:disabled) {
+  background: #fee2e2;
+}
+
 .pet-app {
   width: 100vw;
   height: 100vh;

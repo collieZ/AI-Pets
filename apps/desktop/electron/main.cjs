@@ -503,6 +503,15 @@ ipcMain.handle("desktop:confirm-import-pet-folder-overwrite", async (_event, pet
   return importSelectedPetFolder(pendingPetImport.folderPath, { overwrite: true });
 });
 
+ipcMain.handle("desktop:delete-imported-pet", async (_event, petId) => {
+  const result = await getImportedPetStore().deleteImportedPet(petId);
+  if (result.ok) {
+    broadcastImportedPetsChanged();
+  }
+
+  return result;
+});
+
 ipcMain.handle("desktop:show-context-menu", (event) => {
   const window = BrowserWindow.fromWebContents(event.sender);
   if (!window) {

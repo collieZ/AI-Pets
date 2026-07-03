@@ -1,6 +1,6 @@
 # Electron 桌面应用打包流程
 
-本文记录当前阶段的桌面端打包方案。目标是先跑通 Windows/macOS 安装包流程，签名、公证、自动更新和品牌图标后续再补齐。
+本文记录当前阶段的桌面端打包方案。目标是先跑通 Windows/macOS 安装包流程，签名、公证、自动更新和高分辨率品牌图标后续再补齐。
 
 ## 当前方案
 
@@ -12,7 +12,10 @@
 - macOS：配置 `dmg` 和 `zip` 产物。
 - 构建输出目录：`apps/desktop/release`。
 - 打包内容：`apps/desktop/dist`、`apps/desktop/electron` 和桌面包 `package.json`。
-- 暂不启用代码签名、自动更新和安装包图标。
+- 已配置基础应用图标：`apps/desktop/assets/icon.png`、`icon.ico`、`icon.icns`。
+- 暂不启用代码签名和自动更新。
+
+当前图标来自 32x32 托盘图，能先验证 Dock、Windows 安装包和运行时图标链路。正式发布前应替换为 1024x1024 源图重新生成 `.icns` 和 `.ico`，避免 macOS Dock 或安装包内图标模糊。
 
 ## 常用命令
 
@@ -73,7 +76,7 @@ AI-Pets-0.1.0-mac-x64.zip
 
 ## 后续需要完善
 
-1. 增加正式应用图标。
+1. 替换为高分辨率正式应用图标。
 2. 增加 Windows 代码签名。
 3. 增加 macOS 签名与公证。
 4. 增加自动更新策略。

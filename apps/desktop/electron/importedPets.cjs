@@ -264,12 +264,34 @@ function createImportedPetStore({ userDataPath }) {
     return { ok: true, pet };
   }
 
+  async function deleteImportedPet(petId) {
+    assertSafePetId(petId);
+    const index = await readIndex();
+    const existingEntry = index.pets.find((pet) => pet.id === petId);
+    if (!existingEntry) {
+      return {
+        ok: false,
+        reason: "not-found",
+        petId
+      };
+    }
+
+    await fs.rm(path.join(importedPetsRoot, petId), { recursive: true, force: true });
+    await writeIndex({
+      version: INDEX_VERSION,
+      pets: index.pets.filter((pet) => pet.id !== petId)
+    });
+
+    return { ok: true, petId };
+  }
+
   return {
     getImportedPetsRoot: () => importedPetsRoot,
     getIndexPath: () => indexPath,
     readIndex,
     writeIndex,
-    importPetFolder
+    importPetFolder,
+    deleteImportedPet
   };
 }
 

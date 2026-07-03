@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld("aiPetsDesktop", {
   listImportedPets: () => ipcRenderer.invoke("desktop:list-imported-pets"),
   selectImportPetFolder: () => ipcRenderer.invoke("desktop:select-import-pet-folder"),
   confirmImportPetFolderOverwrite: (petId) => ipcRenderer.invoke("desktop:confirm-import-pet-folder-overwrite", petId),
+  deleteImportedPet: (petId) => ipcRenderer.invoke("desktop:delete-imported-pet", petId),
   showContextMenu: () => ipcRenderer.invoke("desktop:show-context-menu"),
   invalidatePetWindow: () => ipcRenderer.invoke("desktop:invalidate-pet-window"),
   onDesktopState: (callback) => {

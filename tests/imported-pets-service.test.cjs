@@ -144,3 +144,23 @@ test("resolveImportedPetAssetPath rejects unsupported protocol hosts", async () 
     /不支持的 ai-pets 协议地址/
   );
 });
+
+test("deleteImportedPet removes the copied pet folder and index entry", async () => {
+  const userDataPath = await createTempUserData();
+  const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "ai-pets-source-"));
+  const sourceFolder = await createProtocolPetFolder(sourceRoot);
+  const store = createImportedPetStore({ userDataPath });
+
+  await store.importPetFolder(sourceFolder);
+  const result = await store.deleteImportedPet("forest-buddy");
+
+  assert.deepEqual(result, { ok: true, petId: "forest-buddy" });
+  assert.deepEqual(await store.readIndex(), {
+    version: 1,
+    pets: []
+  });
+  await assert.rejects(
+    () => fs.access(path.join(userDataPath, "imported-pets", "forest-buddy")),
+    /ENOENT/
+  );
+});
