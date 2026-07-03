@@ -1,0 +1,15 @@
+---
+description: 将 Cursor 转发到本仓库统一 agent 指令。
+alwaysApply: true
+---
+
+本项目使用 `AGENTS.md` 作为 agent 指令的单一事实源。
+
+开始修改前，请读取并遵循：
+
+- `AGENTS.md`
+- `docs/agents/issue-tracker.md`
+- `docs/agents/triage-labels.md`
+- `docs/agents/domain.md`
+
+本项目默认优先使用中文进行沟通、文档和面向用户的说明。不要在本文件复制或覆盖 `AGENTS.md` 中的规则；如果 agent 指引需要变化，应优先更新 `AGENTS.md` 和它引用的文件。

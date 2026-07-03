@@ -1,18 +1,6 @@
-export type PetCatalogItem =
-  | {
-      id: string;
-      label: string;
-      sourceType: "ai-pet-protocol";
-      manifestUrl: string;
-      assetBaseUrl: string;
-    }
-  | {
-      id: string;
-      label: string;
-      sourceType: "codex-pet";
-      manifestUrl: string;
-      assetBaseUrl: string;
-    };
+import type { PetCatalogItem } from "./petCatalogModel";
+
+export type { PetCatalogItem } from "./petCatalogModel";
 
 const assetBase = import.meta.env.BASE_URL;
 

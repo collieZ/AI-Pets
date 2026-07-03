@@ -8,7 +8,11 @@ contextBridge.exposeInMainWorld("aiPetsDesktop", {
   setAlwaysOnTop: (enabled) => ipcRenderer.invoke("desktop:set-always-on-top", enabled),
   getDesktopState: () => ipcRenderer.invoke("desktop:get-state"),
   dispatchPetCommand: (command) => ipcRenderer.invoke("desktop:dispatch-pet-command", command),
+  listImportedPets: () => ipcRenderer.invoke("desktop:list-imported-pets"),
+  selectImportPetFolder: () => ipcRenderer.invoke("desktop:select-import-pet-folder"),
+  confirmImportPetFolderOverwrite: (petId) => ipcRenderer.invoke("desktop:confirm-import-pet-folder-overwrite", petId),
   showContextMenu: () => ipcRenderer.invoke("desktop:show-context-menu"),
+  invalidatePetWindow: () => ipcRenderer.invoke("desktop:invalidate-pet-window"),
   onDesktopState: (callback) => {
     const listener = (_event, state) => callback(state);
     ipcRenderer.on("desktop:state", listener);
@@ -18,5 +22,10 @@ contextBridge.exposeInMainWorld("aiPetsDesktop", {
     const listener = (_event, command) => callback(command);
     ipcRenderer.on("desktop:pet-command", listener);
     return () => ipcRenderer.removeListener("desktop:pet-command", listener);
+  },
+  onImportedPetsChanged: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on("desktop:imported-pets-changed", listener);
+    return () => ipcRenderer.removeListener("desktop:imported-pets-changed", listener);
   }
 });

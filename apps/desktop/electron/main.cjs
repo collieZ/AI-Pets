@@ -1,6 +1,26 @@
-const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, protocol, Tray } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
+const { pathToFileURL } = require("node:url");
+const { createImportedPetStore, resolveImportedPetAssetPath } = require("./importedPets.cjs");
+
+const isMac = process.platform === "darwin";
+
+if (isMac) {
+  app.disableHardwareAcceleration();
+}
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "ai-pets",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true
+    }
+  }
+]);
 
 let petWindow;
 let settingsWindow;
@@ -8,6 +28,8 @@ let tray;
 let settingsOpen = false;
 let petVisible = true;
 let alwaysOnTop = true;
+let importedPetStore;
+let pendingPetImport;
 
 function getAppEntry() {
   return path.join(__dirname, "..", "dist", "index.html");
@@ -32,6 +54,7 @@ function createPetWindow() {
     transparent: true,
     frame: false,
     alwaysOnTop,
+    ...(isMac ? { hasShadow: false } : {}),
     resizable: false,
     show: false,
     backgroundColor: "#00000000",
@@ -39,13 +62,15 @@ function createPetWindow() {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
+      sandbox: true,
+      ...(isMac ? { backgroundThrottling: false } : {})
     }
   });
 
   petWindow.once("ready-to-show", () => {
     petVisible = true;
     petWindow.show();
+    invalidatePetWindow();
     broadcastDesktopState();
   });
 
@@ -135,6 +160,63 @@ function getOrCreateSettingsWindow() {
   return settingsWindow && !settingsWindow.isDestroyed() ? settingsWindow : createSettingsWindow();
 }
 
+function getImportedPetStore() {
+  if (!importedPetStore) {
+    importedPetStore = createImportedPetStore({ userDataPath: app.getPath("userData") });
+  }
+
+  return importedPetStore;
+}
+
+function getContentType(filePath) {
+  const extension = path.extname(filePath).toLowerCase();
+  if (extension === ".json") {
+    return "application/json";
+  }
+  if (extension === ".webp") {
+    return "image/webp";
+  }
+  if (extension === ".png") {
+    return "image/png";
+  }
+  if (extension === ".svg") {
+    return "image/svg+xml";
+  }
+  return "application/octet-stream";
+}
+
+function createProtocolHeaders(contentType) {
+  return {
+    "access-control-allow-origin": "*",
+    "content-type": contentType
+  };
+}
+
+function registerImportedPetProtocol() {
+  protocol.handle("ai-pets", async (request) => {
+    try {
+      const filePath = resolveImportedPetAssetPath(getImportedPetStore().getImportedPetsRoot(), request.url);
+      const response = await net.fetch(pathToFileURL(filePath).toString());
+      if (!response.ok) {
+        return new Response("未找到导入宠物资源。", {
+          status: response.status,
+          headers: createProtocolHeaders("text/plain; charset=utf-8")
+        });
+      }
+
+      return new Response(response.body, {
+        status: response.status,
+        headers: createProtocolHeaders(getContentType(filePath))
+      });
+    } catch (error) {
+      return new Response(error instanceof Error ? error.message : "导入宠物资源请求失败。", {
+        status: 400,
+        headers: createProtocolHeaders("text/plain; charset=utf-8")
+      });
+    }
+  });
+}
+
 function getDesktopState() {
   return {
     settingsOpen,
@@ -148,6 +230,19 @@ function broadcastDesktopState() {
   for (const window of BrowserWindow.getAllWindows()) {
     window.webContents.send("desktop:state", state);
   }
+}
+
+function invalidatePetWindow() {
+  if (
+    !isMac ||
+    !petWindow ||
+    petWindow.isDestroyed() ||
+    typeof petWindow.invalidateShadow !== "function"
+  ) {
+    return;
+  }
+
+  petWindow.invalidateShadow();
 }
 
 function setSettingsOpen(open) {
@@ -199,6 +294,31 @@ function dispatchPetCommand(command) {
     window.show();
   }
   window.webContents.send("desktop:pet-command", command);
+  invalidatePetWindow();
+}
+
+function broadcastImportedPetsChanged() {
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send("desktop:imported-pets-changed");
+  }
+}
+
+async function importSelectedPetFolder(folderPath, options = {}) {
+  const result = await getImportedPetStore().importPetFolder(folderPath, options);
+  if (result.ok) {
+    pendingPetImport = undefined;
+    broadcastImportedPetsChanged();
+    return result;
+  }
+
+  if (result.reason === "already-exists") {
+    pendingPetImport = {
+      folderPath,
+      petId: result.petId
+    };
+  }
+
+  return result;
 }
 
 function getTrayIconPath() {
@@ -209,6 +329,34 @@ function getTrayIconPath() {
     path.join(__dirname, "..", "assets", "tray.png")
   ];
   return candidates.find((candidate) => fs.existsSync(candidate));
+}
+
+function getAppIconPath() {
+  const candidates = [
+    path.join(process.resourcesPath, "assets", "icon.icns"),
+    path.join(process.resourcesPath, "assets", "icon.png"),
+    path.join(process.resourcesPath, "assets", "tray.png"),
+    path.join(__dirname, "..", "assets", "icon.icns"),
+    path.join(__dirname, "..", "assets", "icon.png"),
+    path.join(__dirname, "..", "assets", "tray.png")
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate));
+}
+
+function setMacDockIcon() {
+  if (!isMac || !app.dock) {
+    return;
+  }
+
+  const iconPath = getAppIconPath();
+  if (!iconPath) {
+    return;
+  }
+
+  const image = nativeImage.createFromPath(iconPath);
+  if (!image.isEmpty()) {
+    app.dock.setIcon(image);
+  }
 }
 
 function createTrayIcon() {
@@ -252,7 +400,16 @@ function buildDesktopMenu() {
       label: "退出 AI-Pets",
       click: () => {
         app.isQuitting = true;
+        if (tray) {
+          tray.destroy();
+          tray = undefined;
+        }
         app.quit();
+        setTimeout(() => {
+          if (app.isQuitting) {
+            app.exit(0);
+          }
+        }, 1000).unref();
       }
     }
   ]);
@@ -310,6 +467,42 @@ ipcMain.handle("desktop:dispatch-pet-command", (_event, command) => {
   dispatchPetCommand(command);
 });
 
+ipcMain.handle("desktop:list-imported-pets", async () => {
+  const index = await getImportedPetStore().readIndex();
+  return index.pets;
+});
+
+ipcMain.handle("desktop:select-import-pet-folder", async (event) => {
+  const parentWindow = BrowserWindow.fromWebContents(event.sender) ?? settingsWindow ?? petWindow;
+  const dialogOptions = {
+    title: "选择宠物包文件夹",
+    properties: ["openDirectory"]
+  };
+  const result = parentWindow
+    ? await dialog.showOpenDialog(parentWindow, dialogOptions)
+    : await dialog.showOpenDialog(dialogOptions);
+
+  if (result.canceled || !result.filePaths[0]) {
+    return {
+      ok: false,
+      reason: "cancelled"
+    };
+  }
+
+  return importSelectedPetFolder(result.filePaths[0]);
+});
+
+ipcMain.handle("desktop:confirm-import-pet-folder-overwrite", async (_event, petId) => {
+  if (!pendingPetImport || pendingPetImport.petId !== petId) {
+    return {
+      ok: false,
+      reason: "no-pending-import"
+    };
+  }
+
+  return importSelectedPetFolder(pendingPetImport.folderPath, { overwrite: true });
+});
+
 ipcMain.handle("desktop:show-context-menu", (event) => {
   const window = BrowserWindow.fromWebContents(event.sender);
   if (!window) {
@@ -319,8 +512,27 @@ ipcMain.handle("desktop:show-context-menu", (event) => {
   buildDesktopMenu().popup({ window });
 });
 
+ipcMain.handle("desktop:invalidate-pet-window", (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (window !== petWindow) {
+    return;
+  }
+
+  invalidatePetWindow();
+});
+
+app.on("before-quit", () => {
+  app.isQuitting = true;
+  if (tray) {
+    tray.destroy();
+    tray = undefined;
+  }
+});
+
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
+  setMacDockIcon();
+  registerImportedPetProtocol();
   createPetWindow();
   createTray();
 
@@ -334,7 +546,7 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform === "darwin") {
+  if (isMac) {
     return;
   }
 

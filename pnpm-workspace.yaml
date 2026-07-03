@@ -3,5 +3,6 @@ packages:
   - "packages/*"
 allowBuilds:
   electron-winstaller: true
+  esbuild: set this to true or false
 minimumReleaseAgeExclude:
   - electron@43.0.0
