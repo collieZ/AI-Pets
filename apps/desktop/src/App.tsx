@@ -248,11 +248,13 @@ function useMergedPetCatalog() {
     };
   }, []);
 
-  return useMemo(() => mergePetCatalogs(petCatalog, importedPets), [importedPets]);
+  const catalog = useMemo(() => mergePetCatalogs(petCatalog, importedPets), [importedPets]);
+
+  return { catalog, importedPets };
 }
 
 function PetView() {
-  const catalog = useMergedPetCatalog();
+  const { catalog } = useMergedPetCatalog();
   const [selectedId, setSelectedId] = useState(() => getInitialPetId(catalog));
   const { selected, pkg, loadState, error, states } = usePetPackage(catalog, selectedId);
   const [activeState, setActiveState] = useState("");
@@ -587,7 +589,7 @@ function PetView() {
 }
 
 function SettingsView() {
-  const catalog = useMergedPetCatalog();
+  const { catalog, importedPets } = useMergedPetCatalog();
   const [selectedId, setSelectedId] = useState(() => getInitialPetId(catalog));
   const { selected, pkg, loadState, error, states } = usePetPackage(catalog, selectedId);
   const desktopState = useDesktopState();
@@ -597,7 +599,6 @@ function SettingsView() {
   const [importing, setImporting] = useState(false);
   const [importMessage, setImportMessage] = useState("");
   const [importError, setImportError] = useState("");
-  const selectedIsImported = selected?.manifestUrl.startsWith("ai-pets://imported-pets/") ?? false;
 
   function dispatch(command: PetCommand) {
     void window.aiPetsDesktop?.dispatchPetCommand(command);
@@ -662,12 +663,12 @@ function SettingsView() {
     }
   }
 
-  async function deleteSelectedImportedPet() {
-    if (!window.aiPetsDesktop || !selected || !selectedIsImported) {
+  async function deleteImportedPet(pet: PetCatalogItem) {
+    if (!window.aiPetsDesktop || !pet.manifestUrl.startsWith("ai-pets://imported-pets/")) {
       return;
     }
 
-    const shouldDelete = window.confirm(`确定删除导入宠物「${selected.label}」吗？这会删除应用管理目录中的副本。`);
+    const shouldDelete = window.confirm(`确定删除导入宠物「${pet.label}」吗？这会删除应用管理目录中的副本。`);
     if (!shouldDelete) {
       return;
     }
@@ -676,13 +677,13 @@ function SettingsView() {
     setImportError("");
 
     try {
-      const result = await window.aiPetsDesktop.deleteImportedPet(selected.id);
+      const result = await window.aiPetsDesktop.deleteImportedPet(pet.id);
       if (result.ok) {
-        const fallbackPetId = getInitialPetId(petCatalog);
-        if (fallbackPetId) {
+        if (selectedId === pet.id) {
+          const fallbackPetId = getInitialPetId(petCatalog);
           selectPet(fallbackPetId);
         }
-        setImportMessage(`已删除导入宠物：${selected.label}`);
+        setImportMessage(`已删除导入宠物：${pet.label}`);
         return;
       }
 
@@ -803,11 +804,6 @@ function SettingsView() {
               </label>
               {loadState === "error" && <p className="error-text">{error}</p>}
               {loadState === "ready" && <p className="muted">已加载：{selected?.label}</p>}
-              {selectedIsImported && (
-                <button className="danger-button" onClick={() => void deleteSelectedImportedPet()} type="button">
-                  删除当前导入宠物
-                </button>
-              )}
             </div>
 
             <div className="setting-card">
@@ -818,6 +814,32 @@ function SettingsView() {
               </button>
               {importMessage && <p className="muted">{importMessage}</p>}
               {importError && <p className="error-text">{importError}</p>}
+            </div>
+
+            <div className="setting-card">
+              <h2>已导入宠物</h2>
+              {importedPets.length === 0 ? (
+                <p className="muted">还没有导入宠物。点击上方按钮选择一个宠物文件夹。</p>
+              ) : (
+                <div className="imported-pet-list">
+                  {importedPets.map((pet) => (
+                    <div className="imported-pet-row" key={pet.id}>
+                      <div>
+                        <strong>{pet.label}</strong>
+                        <p>{pet.id}{selectedId === pet.id ? " · 当前使用" : ""}</p>
+                      </div>
+                      <div className="row-actions">
+                        <button disabled={selectedId === pet.id} onClick={() => selectPet(pet.id)} type="button">
+                          选择
+                        </button>
+                        <button className="danger-button" onClick={() => void deleteImportedPet(pet)} type="button">
+                          删除
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         )}

@@ -287,6 +287,38 @@ button:disabled {
   min-width: 72px;
 }
 
+.imported-pet-list {
+  display: grid;
+  gap: 8px;
+}
+
+.imported-pet-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #fbfcff;
+}
+
+.imported-pet-row strong {
+  display: block;
+}
+
+.imported-pet-row p {
+  margin: 3px 0 0;
+  color: #607089;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .button-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -382,8 +414,14 @@ button:disabled {
   }
 
   .split-card,
-  .inline-form {
+  .inline-form,
+  .imported-pet-row {
     grid-template-columns: 1fr;
+  }
+
+  .row-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .button-grid {
