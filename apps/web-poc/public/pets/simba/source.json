@@ -1,0 +1,7 @@
+{
+  "kind": "wrapped-codex-pet",
+  "sourcePath": "/Users/colliezhou/zzw-code-test-factory/AI-Pets/.tmp/hatch-pet/simba/codex-package",
+  "petJson": "pet.json",
+  "manifest": "manifest.json",
+  "spritesheet": "spritesheet.webp"
+}

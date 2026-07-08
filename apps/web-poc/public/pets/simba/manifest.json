@@ -1,0 +1,176 @@
+{
+  "protocolVersion": "0.1.0",
+  "petId": "simba",
+  "displayName": "辛巴",
+  "description": "参考真实橘猫辛巴照片生成的毛茸茸、蓬松、慵懒风格桌面宠物，保留一只绿色眼睛和一只闭合眼睛的特征。",
+  "sourceFormat": "ai-pet-protocol",
+  "assets": {
+    "atlas": {
+      "path": "spritesheet.webp",
+      "type": "spritesheet",
+      "cellWidth": 192,
+      "cellHeight": 208,
+      "columns": 8,
+      "rows": 9
+    }
+  },
+  "states": {
+    "idle": {
+      "label": "待机",
+      "animation": "idle",
+      "semanticRole": "idle",
+      "loop": true
+    },
+    "moveRight": {
+      "label": "向右移动",
+      "animation": "running-right",
+      "semanticRole": "moveRight",
+      "loop": true
+    },
+    "moveLeft": {
+      "label": "向左移动",
+      "animation": "running-left",
+      "semanticRole": "moveLeft",
+      "loop": true
+    },
+    "greet": {
+      "label": "打招呼",
+      "animation": "waving",
+      "semanticRole": "greet",
+      "loop": false
+    },
+    "jump": {
+      "label": "跳跃",
+      "animation": "jumping",
+      "semanticRole": "jump",
+      "loop": false
+    },
+    "error": {
+      "label": "失败",
+      "animation": "failed",
+      "semanticRole": "error",
+      "loop": false
+    },
+    "waiting": {
+      "label": "等待输入",
+      "animation": "waiting",
+      "semanticRole": "waiting",
+      "loop": true
+    },
+    "working": {
+      "label": "工作中",
+      "animation": "running",
+      "semanticRole": "working",
+      "loop": true
+    },
+    "reviewing": {
+      "label": "检查结果",
+      "animation": "review",
+      "semanticRole": "reviewing",
+      "loop": true
+    }
+  },
+  "animationSets": {
+    "default": {
+      "animations": {
+        "idle": {
+          "row": 0,
+          "frames": 6,
+          "fps": 5
+        },
+        "running-right": {
+          "row": 1,
+          "frames": 8,
+          "fps": 8
+        },
+        "running-left": {
+          "row": 2,
+          "frames": 8,
+          "fps": 8
+        },
+        "waving": {
+          "row": 3,
+          "frames": 4,
+          "fps": 7
+        },
+        "jumping": {
+          "row": 4,
+          "frames": 5,
+          "fps": 8
+        },
+        "failed": {
+          "row": 5,
+          "frames": 8,
+          "fps": 6
+        },
+        "waiting": {
+          "row": 6,
+          "frames": 6,
+          "fps": 4
+        },
+        "running": {
+          "row": 7,
+          "frames": 6,
+          "fps": 8
+        },
+        "review": {
+          "row": 8,
+          "frames": 6,
+          "fps": 5
+        }
+      }
+    }
+  },
+  "interactions": {
+    "click": {
+      "state": "greet",
+      "say": "你好，我是辛巴。"
+    },
+    "aiWorking": {
+      "semanticRole": "working",
+      "say": "辛巴正在处理任务..."
+    },
+    "aiNeedsInput": {
+      "semanticRole": "waiting",
+      "say": "需要你看一眼。"
+    },
+    "aiReview": {
+      "semanticRole": "reviewing",
+      "say": "我来检查一下结果。"
+    },
+    "aiError": {
+      "semanticRole": "error",
+      "say": "刚刚好像遇到了一点问题。"
+    },
+    "aiDone": {
+      "state": "idle",
+      "say": "完成啦。"
+    }
+  },
+  "capabilities": {
+    "speechBubble": true,
+    "drag": true,
+    "stateMachine": true,
+    "externalEvents": true,
+    "customStates": false
+  },
+  "compatibility": {
+    "codexPet": {
+      "supported": true,
+      "sourcePath": "pet.json",
+      "sourceDirectory": "/Users/colliezhou/zzw-code-test-factory/AI-Pets/.tmp/hatch-pet/simba/codex-package",
+      "preset": "codex-9-state",
+      "states": {
+        "idle": "idle",
+        "running-right": "moveRight",
+        "running-left": "moveLeft",
+        "waving": "greet",
+        "jumping": "jump",
+        "failed": "error",
+        "waiting": "waiting",
+        "running": "working",
+        "review": "reviewing"
+      }
+    }
+  }
+}
