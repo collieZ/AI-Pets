@@ -1,18 +1,12 @@
-export type PetCatalogItem =
-  | {
-      id: string;
-      label: string;
-      sourceType: "ai-pet-protocol";
-      manifestUrl: string;
-      assetBaseUrl: string;
-    }
-  | {
-      id: string;
-      label: string;
-      sourceType: "codex-pet";
-      manifestUrl: string;
-      assetBaseUrl: string;
-    };
+export interface PetCatalogItem {
+  id: string;
+  label: string;
+  sourceType: "ai-pet-protocol" | "codex-pet";
+  manifestUrl: string;
+  assetBaseUrl: string;
+  importedAt?: string;
+  updatedAt?: string;
+}
 
 export function mergePetCatalogs(builtInPets: PetCatalogItem[], importedPets: PetCatalogItem[]) {
   const builtInIds = new Set(builtInPets.map((pet) => pet.id));

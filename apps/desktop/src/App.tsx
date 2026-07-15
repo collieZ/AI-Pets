@@ -16,9 +16,11 @@ import { getSpriteViewportStyle } from "./spriteLayout";
 import type {
   DesktopPlatform,
   DesktopState,
+  ExternalAiBridgeLog,
   ExternalAiBridgeStatus,
   ExternalPetEvent,
   PetCommand,
+  PetImportDiagnostic,
   PetImportPreview,
   RecoverySummary,
   SettingsWindowAction
@@ -69,6 +71,24 @@ function getPetLoadErrorMessage(caught: unknown, selected: PetCatalogItem) {
     return `无法读取宠物 manifest：${selected.manifestUrl}`;
   }
   return rawMessage;
+}
+
+function isImportedPet(pet: PetCatalogItem) {
+  return pet.manifestUrl.startsWith("ai-pets://imported-pets/");
+}
+
+function formatLocalDate(value?: string) {
+  if (!value) return "内置资源";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false });
+}
+
+function getBridgeLogSummary(log: ExternalAiBridgeLog) {
+  if (log.event?.interactionId) return `interaction · ${log.event.interactionId}`;
+  if (log.event?.semanticRole) return `semantic · ${log.event.semanticRole}`;
+  if (log.event?.state) return `state · ${log.event.state}`;
+  if (log.event?.say) return `message · ${log.event.say}`;
+  return log.errorCode ?? "无事件内容";
 }
 
 function findIdleStateId(states: RenderableState[]) {
@@ -685,11 +705,13 @@ function SettingsView() {
   const [importing, setImporting] = useState(false);
   const [importMessage, setImportMessage] = useState("");
   const [importError, setImportError] = useState("");
+  const [importDiagnostics, setImportDiagnostics] = useState<PetImportDiagnostic[]>([]);
   const [pendingImport, setPendingImport] = useState<PetImportPreview | null>(null);
   const [settingsMessage, setSettingsMessage] = useState("");
   const [platform, setPlatform] = useState<DesktopPlatform>(getFallbackDesktopPlatform);
   const [recoverySummary, setRecoverySummary] = useState<RecoverySummary | null>(null);
   const [bridgeStatus, setBridgeStatus] = useState<ExternalAiBridgeStatus | null>(null);
+  const [bridgeLogs, setBridgeLogs] = useState<ExternalAiBridgeLog[]>([]);
 
   useEffect(() => {
     const getPlatform = window.aiPetsDesktop?.getPlatform;
@@ -703,6 +725,10 @@ function SettingsView() {
   useEffect(() => {
     void window.aiPetsDesktop?.getRecoverySummary().then(setRecoverySummary);
     void window.aiPetsDesktop?.getExternalAiBridgeStatus().then(setBridgeStatus);
+    void window.aiPetsDesktop?.getExternalAiBridgeLogs().then((logs) => setBridgeLogs(logs.slice().reverse()));
+    return window.aiPetsDesktop?.onExternalAiBridgeLog((entry) => {
+      setBridgeLogs((current) => [entry, ...current].slice(0, 100));
+    });
   }, []);
 
   useEffect(() => {
@@ -749,6 +775,7 @@ function SettingsView() {
     setImporting(true);
     setImportMessage("");
     setImportError("");
+    setImportDiagnostics([]);
     setPendingImport(null);
 
     try {
@@ -763,12 +790,8 @@ function SettingsView() {
         setImportMessage("已取消导入。");
         return;
       }
-      if (result.reason === "invalid-package") {
-        setImportError(`无法导入：${result.message ?? "宠物包校验失败。"}`);
-        return;
-      }
-
-      setImportError("导入失败，请检查宠物文件夹。");
+      setImportError(result.message ?? "导入失败，请检查宠物文件夹。");
+      setImportDiagnostics(result.diagnostics ?? []);
     } catch (caught) {
       setImportError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -784,6 +807,7 @@ function SettingsView() {
     setImporting(true);
     setImportMessage("");
     setImportError("");
+    setImportDiagnostics([]);
     try {
       const result = await window.aiPetsDesktop.confirmImportPetFolder(pendingImport.token);
       if (result.ok) {
@@ -793,6 +817,7 @@ function SettingsView() {
         return;
       }
       setImportError(`无法导入：${result.message}`);
+      setImportDiagnostics(result.diagnostics ?? []);
     } catch (caught) {
       setImportError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -850,6 +875,7 @@ function SettingsView() {
 
     setImportMessage("");
     setImportError("");
+    setImportDiagnostics([]);
 
     try {
       const result = await window.aiPetsDesktop.deleteImportedPet(pet.id);
@@ -866,6 +892,28 @@ function SettingsView() {
     } catch (caught) {
       setImportError(caught instanceof Error ? caught.message : String(caught));
     }
+  }
+
+  async function copyImportDiagnostics() {
+    const details = importDiagnostics.length > 0
+      ? importDiagnostics.map((item, index) => [
+          `${index + 1}. ${item.title} [${item.code}]`,
+          item.path ? `位置：${item.path}` : "",
+          `原因：${item.detail}`,
+          `建议：${item.suggestion}`
+        ].filter(Boolean).join("\n")).join("\n\n")
+      : importError;
+    try {
+      await navigator.clipboard.writeText(`AI-Pets 宠物包导入诊断\n\n${details}`);
+      setImportMessage("诊断信息已复制。");
+    } catch {
+      setImportMessage("无法访问剪贴板，请手动选择诊断文本。");
+    }
+  }
+
+  async function clearBridgeLogs() {
+    await window.aiPetsDesktop?.clearExternalAiBridgeLogs();
+    setBridgeLogs([]);
   }
 
   const debugInfo = {
@@ -1030,24 +1078,76 @@ function SettingsView() {
               </div>
             )}
 
-            <div className="setting-card">
-              <h2>当前宠物</h2>
-              <label className="field">
-                <span>选择宠物包</span>
-                <select value={selectedId} onChange={(event) => selectPet(event.target.value)}>
+            <div className="pet-library-layout">
+              <aside className="setting-card pet-library-panel">
+                <div className="card-heading-row">
+                  <div>
+                    <h2>宠物库</h2>
+                    <p>{catalog.length} 个伙伴 · {importedPets.length} 个导入</p>
+                  </div>
+                  <span className="count-badge">{catalog.length}/32</span>
+                </div>
+                <div className="pet-library-list">
                   {catalog.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.label}
-                    </option>
+                    <button
+                      className={`pet-library-item${selectedId === item.id ? " active" : ""}`}
+                      key={item.id}
+                      onClick={() => selectPet(item.id)}
+                      type="button"
+                    >
+                      <span className="pet-library-avatar">{item.label.slice(0, 1)}</span>
+                      <span>
+                        <b>{item.label}</b>
+                        <small>{isImportedPet(item) ? "导入宠物" : "内置宠物"} · {getPetSourceLabel(item.sourceType)}</small>
+                      </span>
+                      {selectedId === item.id && <i>使用中</i>}
+                    </button>
                   ))}
-                </select>
-              </label>
-              {loadState === "error" && <p className="error-text">{error}</p>}
-              {loadState === "ready" && pkg && selected && (
-                <p className="muted">
-                  已加载：{selected.label} · {getPetSourceLabel(selected.sourceType)} · {states.length} 个状态 · {pkg.assets.atlas.cellWidth} × {pkg.assets.atlas.cellHeight} px
-                </p>
-              )}
+                </div>
+              </aside>
+
+              <article className="setting-card pet-detail-panel">
+                {loadState === "loading" && <p className="muted">正在读取宠物包详情...</p>}
+                {loadState === "error" && <p className="error-text">{error}</p>}
+                {loadState === "ready" && pkg && selected && (
+                  <>
+                    <div className="pet-detail-hero">
+                      <div className="pet-detail-mark">{selected.label.slice(0, 1)}</div>
+                      <div>
+                        <span className="source-pill">{isImportedPet(selected) ? "已导入" : "内置"}</span>
+                        <h2>{pkg.displayName}</h2>
+                        <p>{pkg.description || "这个宠物还没有填写介绍。"}</p>
+                      </div>
+                    </div>
+                    <dl className="package-metadata">
+                      <div><dt>宠物 ID</dt><dd>{pkg.petId}</dd></div>
+                      <div><dt>协议</dt><dd>{getPetSourceLabel(selected.sourceType)} · {pkg.protocolVersion}</dd></div>
+                      <div><dt>雪碧图单元</dt><dd>{pkg.assets.atlas.cellWidth} × {pkg.assets.atlas.cellHeight} px</dd></div>
+                      <div><dt>更新时间</dt><dd>{formatLocalDate(selected.updatedAt ?? selected.importedAt)}</dd></div>
+                    </dl>
+                    <div className="package-capability-block">
+                      <span>动作状态 · {states.length}</span>
+                      <div className="tag-cloud">
+                        {states.map((state) => <b key={state.id}>{state.label}</b>)}
+                      </div>
+                    </div>
+                    <div className="package-capability-block">
+                      <span>交互事件 · {Object.keys(pkg.interactions).length}</span>
+                      <div className="tag-cloud">
+                        {Object.keys(pkg.interactions).length > 0
+                          ? Object.keys(pkg.interactions).map((interactionId) => <b key={interactionId}>{interactionId}</b>)
+                          : <em>未声明交互事件</em>}
+                      </div>
+                    </div>
+                    <div className="row-actions pet-detail-actions">
+                      <span className="current-pet-status">当前使用中</span>
+                      {isImportedPet(selected) && (
+                        <button className="danger-button" onClick={() => void deleteImportedPet(selected)} type="button">删除导入副本</button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </article>
             </div>
 
             <div className="setting-card">
@@ -1076,32 +1176,30 @@ function SettingsView() {
                   </div>
                 </div>
               )}
-              {importMessage && <p className="muted">{importMessage}</p>}
-              {importError && <p className="error-text">{importError}</p>}
-            </div>
-
-            <div className="setting-card">
-              <h2>已导入宠物</h2>
-              {importedPets.length === 0 ? (
-                <p className="muted">还没有导入宠物。点击上方按钮选择一个宠物文件夹。</p>
-              ) : (
-                <div className="imported-pet-list">
-                  {importedPets.map((pet) => (
-                    <div className="imported-pet-row" key={pet.id}>
-                      <div>
-                        <strong>{pet.label}</strong>
-                        <p>{pet.id}{selectedId === pet.id ? " · 当前使用" : ""}</p>
-                      </div>
-                      <div className="row-actions">
-                        <button disabled={selectedId === pet.id} onClick={() => selectPet(pet.id)} type="button">
-                          选择
-                        </button>
-                        <button className="danger-button" onClick={() => void deleteImportedPet(pet)} type="button">
-                          删除
-                        </button>
-                      </div>
+              {importMessage && <p className="muted" role="status">{importMessage}</p>}
+              {importError && (
+                <div className="import-diagnostics" role="alert">
+                  <div className="diagnostic-heading">
+                    <div>
+                      <span>导入未完成</span>
+                      <strong>{importError}</strong>
                     </div>
-                  ))}
+                    <button onClick={() => void copyImportDiagnostics()} type="button">复制诊断</button>
+                  </div>
+                  {importDiagnostics.length > 0 && (
+                    <div className="diagnostic-list">
+                      {importDiagnostics.map((item, index) => (
+                        <details key={`${item.code}-${item.path ?? index}`} open={index === 0}>
+                          <summary>
+                            <span>{item.title}</span>
+                            <code>{item.path ?? item.code}</code>
+                          </summary>
+                          <p>{item.detail}</p>
+                          <small>建议：{item.suggestion}</small>
+                        </details>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1139,16 +1237,44 @@ function SettingsView() {
             </div>
 
             <div className="setting-card">
-              <h2>外部 AI 事件桥</h2>
-              <p className="muted">
-                {bridgeStatus?.running
-                  ? `正在监听 ${bridgeStatus.endpoint}`
-                  : `事件桥未运行${bridgeStatus?.lastError ? `：${bridgeStatus.lastError}` : "。"}`}
-              </p>
+              <div className="card-heading-row">
+                <div>
+                  <h2>外部 AI 事件桥</h2>
+                  <p className="muted">
+                    {bridgeStatus?.running
+                      ? `正在监听 ${bridgeStatus.endpoint}`
+                      : `事件桥未运行${bridgeStatus?.lastError ? `：${bridgeStatus.lastError}` : "。"}`}
+                  </p>
+                </div>
+                <span className={`bridge-status${bridgeStatus?.running ? " online" : ""}`}>
+                  {bridgeStatus?.running ? "运行中" : "离线"}
+                </span>
+              </div>
               {bridgeStatus?.running && (
                 <pre className="bridge-command"><code>{`curl -X POST ${bridgeStatus.endpoint} \\
   -H 'Content-Type: application/json' \\
   -d '{"type":"pet.event","interactionId":"aiWorking","say":"正在处理任务...","source":"codex"}'`}</code></pre>
+              )}
+              <div className="bridge-log-heading">
+                <span>最近调用</span>
+                <button disabled={bridgeLogs.length === 0} onClick={() => void clearBridgeLogs()} type="button">清空</button>
+              </div>
+              {bridgeLogs.length === 0 ? (
+                <div className="bridge-log-empty">事件到达后会在这里显示，不会写入磁盘。</div>
+              ) : (
+                <div className="bridge-log-list">
+                  {bridgeLogs.map((log) => (
+                    <div className={`bridge-log-item ${log.outcome}`} key={log.id}>
+                      <span className="bridge-log-dot" />
+                      <div>
+                        <strong>{getBridgeLogSummary(log)}</strong>
+                        <small>{new Date(log.timestamp).toLocaleTimeString("zh-CN", { hour12: false })} · {log.source ?? "unknown"} · HTTP {log.statusCode}</small>
+                        {log.event?.say && <p>{log.event.say}</p>}
+                        {log.outcome === "rejected" && <p>{log.message}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 

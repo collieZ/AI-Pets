@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { inspectPetPackage } from "../apps/desktop/electron/src/petPackageIntake.ts";
+import { inspectPetPackage, PetPackageIntakeError } from "../apps/desktop/electron/src/petPackageIntake.ts";
 
 async function tempFolder() {
   return mkdtemp(path.join(os.tmpdir(), "ai-pets-intake-"));
@@ -47,4 +47,25 @@ test("inspectPetPackage rejects unsafe cross-platform pet ids", async () => {
     await writeFile(path.join(folder, "pet.json"), JSON.stringify({ id: petId }));
     await assert.rejects(() => inspectPetPackage(folder), /petId/);
   }
+});
+
+test("inspectPetPackage exposes structured protocol diagnostics", async () => {
+  const folder = await tempFolder();
+  await writeFile(path.join(folder, "spritesheet.webp"), "image");
+  await writeFile(path.join(folder, "manifest.json"), JSON.stringify({
+    protocolVersion: "0.1.0",
+    petId: "broken-pet",
+    displayName: "损坏宠物"
+  }));
+
+  await assert.rejects(
+    () => inspectPetPackage(folder),
+    (error) => {
+      assert.ok(error instanceof PetPackageIntakeError);
+      assert.ok(error.diagnostics.length > 0);
+      assert.equal(error.diagnostics[0]?.code, "protocol-validation");
+      assert.ok(error.diagnostics.every((item) => item.title && item.detail && item.suggestion));
+      return true;
+    }
+  );
 });

@@ -64,3 +64,37 @@ test("HTTP bridge rejects invalid content types and bodies", async () => {
     await bridge.stop();
   }
 });
+
+test("HTTP bridge keeps a bounded log of accepted and rejected events", async () => {
+  const observed: string[] = [];
+  const bridge = createExternalAiBridge({
+    port: 0,
+    dispatch: () => undefined,
+    maxLogEntries: 2,
+    onLog: (entry) => observed.push(entry.outcome)
+  });
+  const status = await bridge.start();
+  try {
+    await fetch(status.endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ type: "pet.event", say: "one", source: "test" })
+    });
+    await fetch(status.endpoint, { method: "POST", body: "{}" });
+    await fetch(status.endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ type: "pet.event", say: "two" })
+    });
+
+    const logs = bridge.getLogs();
+    assert.deepEqual(observed, ["accepted", "rejected", "accepted"]);
+    assert.equal(logs.length, 2);
+    assert.equal(logs[0]?.outcome, "rejected");
+    assert.equal(logs[1]?.event?.say, "two");
+    bridge.clearLogs();
+    assert.equal(bridge.getLogs().length, 0);
+  } finally {
+    await bridge.stop();
+  }
+});

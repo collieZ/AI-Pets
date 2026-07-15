@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { lstat, mkdir, readFile, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { getPetIdKey, inspectPetPackage, isSafePetId, PetPackageIntakeError, type PetPackageInspection } from "../petPackageIntake.js";
+import { getPetIdKey, inspectPetPackage, isSafePetId, PetPackageIntakeError, type PetImportDiagnostic, type PetPackageInspection } from "../petPackageIntake.js";
 import { assertImportFolderTreeSafe, copyImportFolderSnapshot, defaultImportResourceLimits, ImportResourceError, type ImportResourceLimits } from "./resourceBudget.js";
 import {
   emptyImportedPetIndex,
@@ -32,11 +32,13 @@ export type ImportedPetErrorReason =
 
 export class ImportedPetTransactionError extends Error {
   readonly reason: ImportedPetErrorReason;
+  readonly diagnostics: PetImportDiagnostic[];
 
-  constructor(reason: ImportedPetErrorReason, message: string) {
+  constructor(reason: ImportedPetErrorReason, message: string, diagnostics: PetImportDiagnostic[] = []) {
     super(message);
     this.name = "ImportedPetTransactionError";
     this.reason = reason;
+    this.diagnostics = diagnostics;
   }
 }
 
@@ -114,8 +116,17 @@ function toCatalogItem(pet: ImportedPetIdentity): ImportedPetCatalogItem {
 
 function mapImportError(error: unknown): ImportedPetTransactionError {
   if (error instanceof ImportedPetTransactionError) return error;
-  if (error instanceof PetPackageIntakeError) return new ImportedPetTransactionError(error.reason, error.message);
-  if (error instanceof ImportResourceError) return new ImportedPetTransactionError(error.reason, error.message);
+  if (error instanceof PetPackageIntakeError) return new ImportedPetTransactionError(error.reason, error.message, error.diagnostics);
+  if (error instanceof ImportResourceError) {
+    return new ImportedPetTransactionError(error.reason, error.message, [{
+      code: error.reason,
+      title: error.reason === "resource-limit" ? "宠物包超出资源限制" : "宠物包包含不安全内容",
+      detail: error.message,
+      suggestion: error.reason === "resource-limit"
+        ? "减少文件数量、目录层级或资源体积后重新导入。"
+        : "移除符号链接、特殊文件和越界路径后重新导入。"
+    }]);
+  }
   return new ImportedPetTransactionError("transaction-failed", error instanceof Error ? error.message : String(error));
 }
 

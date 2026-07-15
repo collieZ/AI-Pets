@@ -35,6 +35,17 @@ export interface ExternalAiBridgeStatus {
   lastError?: string;
 }
 
+export interface ExternalAiBridgeLog {
+  id: string;
+  timestamp: string;
+  statusCode: number;
+  outcome: "accepted" | "rejected";
+  source?: string;
+  event?: ExternalPetEvent;
+  errorCode?: string;
+  message: string;
+}
+
 export type PetCommand =
   | { type: "selectPet"; selectedId: string }
   | { type: "state"; stateId: string }
@@ -55,6 +66,14 @@ export type ImportedPetErrorReason =
   | "transaction-failed"
   | "recovery-required";
 
+export interface PetImportDiagnostic {
+  code: string;
+  title: string;
+  detail: string;
+  path?: string;
+  suggestion: string;
+}
+
 export interface PetImportPreview {
   token: string;
   petId: string;
@@ -69,11 +88,11 @@ export interface PetImportPreview {
 
 export type SelectImportPetFolderResult =
   | { ok: true; preview: PetImportPreview }
-  | { ok: false; reason: "cancelled" | ImportedPetErrorReason; message?: string };
+  | { ok: false; reason: "cancelled" | ImportedPetErrorReason; message?: string; diagnostics?: PetImportDiagnostic[] };
 
 export type ImportPetFolderResult =
   | { ok: true; pet: PetCatalogItem }
-  | { ok: false; reason: ImportedPetErrorReason; message: string };
+  | { ok: false; reason: ImportedPetErrorReason; message: string; diagnostics?: PetImportDiagnostic[] };
 
 export type DeleteImportedPetResult =
   | { ok: true; petId: string }
@@ -106,6 +125,8 @@ export interface DesktopApi {
   openPetQuarantineDirectory(): Promise<OpenPetDataDirectoryResult>;
   getRecoverySummary(): Promise<RecoverySummary | null>;
   getExternalAiBridgeStatus(): Promise<ExternalAiBridgeStatus>;
+  getExternalAiBridgeLogs(): Promise<ExternalAiBridgeLog[]>;
+  clearExternalAiBridgeLogs(): Promise<void>;
   showContextMenu(): Promise<void>;
   invalidatePetWindow(): Promise<void>;
   getPlatform(): Promise<DesktopPlatform>;
@@ -113,6 +134,7 @@ export interface DesktopApi {
   onDesktopState(callback: (state: DesktopState) => void): () => void;
   onPetCommand(callback: (command: PetCommand) => void): () => void;
   onImportedPetsChanged(callback: () => void): () => void;
+  onExternalAiBridgeLog(callback: (entry: ExternalAiBridgeLog) => void): () => void;
 }
 
 declare global {

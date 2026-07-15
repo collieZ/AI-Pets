@@ -8,6 +8,7 @@
   "type": "module",
   "main": "electron/generated/main.cjs",
   "scripts": {
+    "icons": "sh scripts/generate-icons.sh",
     "dev": "vite --host 127.0.0.1 --port 5174",
     "build:electron": "node electron/build.mjs",
     "build": "pnpm build:electron && vite build",

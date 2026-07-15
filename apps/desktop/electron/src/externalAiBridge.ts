@@ -24,6 +24,17 @@ export interface ExternalAiBridgeStatus {
   lastError?: string;
 }
 
+export interface ExternalAiBridgeLog {
+  id: string;
+  timestamp: string;
+  statusCode: number;
+  outcome: "accepted" | "rejected";
+  source?: string;
+  event?: ExternalPetEvent;
+  errorCode?: string;
+  message: string;
+}
+
 export class ExternalAiBridgeError extends Error {
   constructor(
     readonly code: "invalid-json" | "invalid-event" | "body-too-large" | "rate-limited",
@@ -103,11 +114,16 @@ export function createExternalAiBridge(options: {
   dispatch(event: ExternalPetEvent): void | Promise<void>;
   now?: () => number;
   maxBodyBytes?: number;
+  maxLogEntries?: number;
+  onLog?(entry: ExternalAiBridgeLog): void;
 }) {
   const port = options.port ?? DEFAULT_PORT;
   const now = options.now ?? Date.now;
   const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
+  const maxLogEntries = options.maxLogEntries ?? 100;
   const acceptedEventTimes: number[] = [];
+  const logs: ExternalAiBridgeLog[] = [];
+  let logSequence = 0;
   let server: Server | undefined;
   let status: ExternalAiBridgeStatus = {
     running: false,
@@ -125,6 +141,17 @@ export function createExternalAiBridge(options: {
     acceptedEventTimes.push(now());
   }
 
+  function recordLog(entry: Omit<ExternalAiBridgeLog, "id" | "timestamp">) {
+    const log: ExternalAiBridgeLog = {
+      id: `${now()}-${++logSequence}`,
+      timestamp: new Date(now()).toISOString(),
+      ...entry
+    };
+    logs.push(log);
+    if (logs.length > maxLogEntries) logs.splice(0, logs.length - maxLogEntries);
+    options.onLog?.(log);
+  }
+
   async function handleRequest(request: IncomingMessage, response: ServerResponse) {
     const url = new URL(request.url ?? "/", `http://${DEFAULT_HOST}`);
     if (request.method === "GET" && url.pathname === "/health") {
@@ -135,18 +162,34 @@ export function createExternalAiBridge(options: {
       sendJson(response, 404, { ok: false, error: "not-found", message: "接口不存在。" });
       return;
     }
+    let event: ExternalPetEvent | undefined;
     try {
       if (!(request.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) {
         throw new ExternalAiBridgeError("invalid-json", "Content-Type 必须是 application/json。", 415);
       }
-      const event = parseExternalPetEvent(await readJsonBody(request, maxBodyBytes));
+      event = parseExternalPetEvent(await readJsonBody(request, maxBodyBytes));
       checkRateLimit();
       await options.dispatch(event);
+      recordLog({
+        statusCode: 202,
+        outcome: "accepted",
+        source: event.source,
+        event,
+        message: "事件已接收并投递。"
+      });
       sendJson(response, 202, { ok: true, accepted: event });
     } catch (error) {
       const bridgeError = error instanceof ExternalAiBridgeError
         ? error
         : new ExternalAiBridgeError("invalid-event", error instanceof Error ? error.message : "事件处理失败。", 500);
+      recordLog({
+        statusCode: bridgeError.statusCode,
+        outcome: "rejected",
+        source: event?.source,
+        event,
+        errorCode: bridgeError.code,
+        message: bridgeError.message
+      });
       sendJson(response, bridgeError.statusCode, { ok: false, error: bridgeError.code, message: bridgeError.message });
     }
   }
@@ -185,5 +228,11 @@ export function createExternalAiBridge(options: {
     status = { ...status, running: false };
   }
 
-  return { start, stop, getStatus: () => ({ ...status }) };
+  return {
+    start,
+    stop,
+    getStatus: () => ({ ...status }),
+    getLogs: () => logs.map((entry) => ({ ...entry, event: entry.event ? { ...entry.event } : undefined })),
+    clearLogs: () => logs.splice(0)
+  };
 }

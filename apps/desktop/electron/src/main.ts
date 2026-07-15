@@ -41,11 +41,22 @@ const MAX_PENDING_PET_COMMANDS = 30;
 const configuredBridgePort = Number(process.env.AI_PETS_EVENT_PORT ?? "17321");
 const externalAiBridge = createExternalAiBridge({
   port: Number.isInteger(configuredBridgePort) && configuredBridgePort >= 1 && configuredBridgePort <= 65535 ? configuredBridgePort : 17321,
-  dispatch: (event) => dispatchPetCommand({ type: "externalEvent", event })
+  dispatch: (event) => dispatchPetCommand({ type: "externalEvent", event }),
+  onLog: (entry) => {
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      settingsWindow.webContents.send("desktop:external-ai-bridge-log", entry);
+    }
+  }
 });
 
 function getImportedPetErrorReason(error, fallback) {
   return error instanceof ImportedPetTransactionError && typeof error.reason === "string" ? error.reason : fallback;
+}
+
+function getImportedPetDiagnostics(error) {
+  return error instanceof ImportedPetTransactionError && Array.isArray(error.diagnostics)
+    ? error.diagnostics
+    : [];
 }
 
 function getResourcesPath() {
@@ -420,7 +431,8 @@ async function preparePetImport(folderPath) {
     return {
       ok: false,
       reason: getImportedPetErrorReason(error, "invalid-package"),
-      message: error instanceof Error ? error.message : "宠物包校验失败。"
+      message: error instanceof Error ? error.message : "宠物包校验失败。",
+      diagnostics: getImportedPetDiagnostics(error)
     };
   }
 }
@@ -594,6 +606,16 @@ ipcMain.handle("desktop:get-external-ai-bridge-status", (event) => {
   return externalAiBridge.getStatus();
 });
 
+ipcMain.handle("desktop:get-external-ai-bridge-logs", (event) => {
+  if (!isSettingsSender(event)) return [];
+  return externalAiBridge.getLogs();
+});
+
+ipcMain.handle("desktop:clear-external-ai-bridge-logs", (event) => {
+  if (!isSettingsSender(event)) return;
+  externalAiBridge.clearLogs();
+});
+
 ipcMain.handle("desktop:dispatch-pet-command", (_event, command) => {
   dispatchPetCommand(command);
 });
@@ -633,7 +655,8 @@ ipcMain.handle("desktop:confirm-import-pet-folder", async (event, token) => {
     return {
       ok: false,
       reason: getImportedPetErrorReason(error, "transaction-failed"),
-      message: error instanceof Error ? error.message : "导入事务失败。"
+      message: error instanceof Error ? error.message : "导入事务失败。",
+      diagnostics: getImportedPetDiagnostics(error)
     };
   }
 });

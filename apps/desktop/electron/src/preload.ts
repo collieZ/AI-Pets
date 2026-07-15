@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld("aiPetsDesktop", {
   openPetQuarantineDirectory: () => ipcRenderer.invoke("desktop:open-pet-quarantine-directory"),
   getRecoverySummary: () => ipcRenderer.invoke("desktop:get-recovery-summary"),
   getExternalAiBridgeStatus: () => ipcRenderer.invoke("desktop:get-external-ai-bridge-status"),
+  getExternalAiBridgeLogs: () => ipcRenderer.invoke("desktop:get-external-ai-bridge-logs"),
+  clearExternalAiBridgeLogs: () => ipcRenderer.invoke("desktop:clear-external-ai-bridge-logs"),
   showContextMenu: () => ipcRenderer.invoke("desktop:show-context-menu"),
   invalidatePetWindow: () => ipcRenderer.invoke("desktop:invalidate-pet-window"),
   getPlatform: () => Promise.resolve(process.platform),
@@ -37,5 +39,10 @@ contextBridge.exposeInMainWorld("aiPetsDesktop", {
     const listener = () => callback();
     ipcRenderer.on("desktop:imported-pets-changed", listener);
     return () => ipcRenderer.removeListener("desktop:imported-pets-changed", listener);
+  },
+  onExternalAiBridgeLog: (callback) => {
+    const listener = (_event, entry) => callback(entry);
+    ipcRenderer.on("desktop:external-ai-bridge-log", listener);
+    return () => ipcRenderer.removeListener("desktop:external-ai-bridge-log", listener);
   }
 });
