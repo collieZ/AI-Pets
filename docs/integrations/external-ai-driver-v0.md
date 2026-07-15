@@ -16,6 +16,8 @@ MVP 初版推荐先做本地 HTTP：
 - 对外部应用门槛低。
 - 只监听 `127.0.0.1`，默认不暴露到局域网或公网。
 
+桌面端当前默认监听 `127.0.0.1:17321`。可在启动前通过 `AI_PETS_EVENT_PORT` 修改端口；非法端口会回退到默认值。
+
 WebSocket 可以作为后续增强，用于连续流式消息、长任务进度和更低延迟状态同步。
 
 ## 事件格式
@@ -60,6 +62,8 @@ POST /api/pet/event
 Content-Type: application/json
 ```
 
+健康检查使用 `GET /health`。
+
 请求体使用上面的事件格式。
 
 响应示例：
@@ -67,9 +71,9 @@ Content-Type: application/json
 ```json
 {
   "ok": true,
-  "applied": {
-    "state": "running",
-    "semanticRole": "working",
+  "accepted": {
+    "type": "pet.event",
+    "interactionId": "aiWorking",
     "say": "正在处理任务..."
   }
 }
@@ -80,8 +84,8 @@ Content-Type: application/json
 ```json
 {
   "ok": false,
-  "error": "unknown_state",
-  "message": "状态 running 不存在"
+  "error": "invalid-event",
+  "message": "事件至少需要 interactionId、state、semanticRole 或 say。"
 }
 ```
 
@@ -92,4 +96,16 @@ Content-Type: application/json
 - 不执行外部传入的脚本、命令或文件路径。
 - `say` 只作为展示文本处理，不参与系统提示词或命令执行。
 - 事件频率需要节流，避免外部应用高频刷状态导致动画抖动。
+- 单次 JSON 请求体最多 64 KB，`say` 最多 500 个字符，`durationMs` 范围为 100-600000 毫秒。
+- 当前按 10 秒最多 30 个事件限流，超限返回 HTTP 429。
+- 接口不返回 CORS 许可头，避免普通网页跨域调用本地事件桥。
 
+## 调用示例
+
+```bash
+curl -X POST http://127.0.0.1:17321/api/pet/event \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"pet.event","interactionId":"aiWorking","say":"正在处理任务...","durationMs":3000,"source":"codex"}'
+```
+
+服务成功接收并投递事件时返回 HTTP 202。该响应表示事件已进入桌面宠物 renderer，不表示指定状态一定存在；不存在的状态或 interaction 会被当前宠物包安全忽略，但 `say` 仍可单独显示。

@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld("aiPetsDesktop", {
   openPetDataDirectory: () => ipcRenderer.invoke("desktop:open-pet-data-directory"),
   openPetQuarantineDirectory: () => ipcRenderer.invoke("desktop:open-pet-quarantine-directory"),
   getRecoverySummary: () => ipcRenderer.invoke("desktop:get-recovery-summary"),
+  getExternalAiBridgeStatus: () => ipcRenderer.invoke("desktop:get-external-ai-bridge-status"),
   showContextMenu: () => ipcRenderer.invoke("desktop:show-context-menu"),
   invalidatePetWindow: () => ipcRenderer.invoke("desktop:invalidate-pet-window"),
   getPlatform: () => Promise.resolve(process.platform),

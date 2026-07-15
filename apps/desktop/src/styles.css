@@ -162,6 +162,8 @@ select option { background: #fff; color: #40576d; }
 .debug-list div { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; }
 .debug-list dt { color: #8295a5; }
 .debug-list dd { margin: 0; overflow-wrap: anywhere; }
+.bridge-command { margin: 0; padding: 14px 16px; overflow-x: auto; border: 1px solid rgb(121 166 196 / 20%); border-radius: 12px; background: rgb(227 242 250 / 52%); color: #36546c; font: 500 12px/1.65 "SFMono-Regular", Consolas, monospace; white-space: pre-wrap; scrollbar-width: none; }
+.bridge-command::-webkit-scrollbar { display: none; }
 
 @media (max-width: 760px) {
   .settings-app { grid-template-columns: 1fr; grid-template-rows: 46px auto minmax(0, 1fr); }

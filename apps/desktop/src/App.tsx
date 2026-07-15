@@ -16,11 +16,14 @@ import { getSpriteViewportStyle } from "./spriteLayout";
 import type {
   DesktopPlatform,
   DesktopState,
+  ExternalAiBridgeStatus,
+  ExternalPetEvent,
   PetCommand,
   PetImportPreview,
   RecoverySummary,
   SettingsWindowAction
 } from "./desktopContracts";
+import { resolveExternalPetEvent } from "./externalEventResolver";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 type SettingsTab = "basic" | "packages" | "testing";
@@ -256,6 +259,7 @@ function PetView() {
   const dragRef = useRef<DragSnapshot | null>(null);
   const lastPetWindowInvalidationRef = useRef(0);
   const lastPetWindowInvalidationKeyRef = useRef("");
+  const externalIdleTimeoutRef = useRef<number | null>(null);
 
   const speechOpacity =
     speech && speechDeadline
@@ -281,6 +285,10 @@ function PetView() {
       return;
     }
 
+    if (externalIdleTimeoutRef.current !== null) {
+      window.clearTimeout(externalIdleTimeoutRef.current);
+      externalIdleTimeoutRef.current = null;
+    }
     setElapsed(0);
     setActiveState(nextStateId);
   }
@@ -289,7 +297,7 @@ function PetView() {
     switchState(findIdleStateId(states));
   }
 
-  function showSpeech(nextSpeech: string) {
+  function showSpeech(nextSpeech: string, durationMs = speechDisplayDurationMs) {
     const normalizedSpeech = nextSpeech.trim();
     if (!normalizedSpeech) {
       setSpeech(null);
@@ -298,8 +306,14 @@ function PetView() {
     }
 
     setSpeech(normalizedSpeech);
-    setSpeechDeadline(performance.now() + speechDisplayDurationMs);
+    setSpeechDeadline(performance.now() + durationMs);
   }
+
+  useEffect(() => () => {
+    if (externalIdleTimeoutRef.current !== null) {
+      window.clearTimeout(externalIdleTimeoutRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     const getPreferences = window.aiPetsDesktop?.getPreferences;
@@ -332,6 +346,20 @@ function PetView() {
     }
   }
 
+  function triggerExternalEvent(event: ExternalPetEvent) {
+    if (!pkg) return;
+    const resolvedEvent = resolveExternalPetEvent(pkg, event);
+    if (resolvedEvent.stateId) switchState(resolvedEvent.stateId);
+    if (resolvedEvent.say) showSpeech(resolvedEvent.say, resolvedEvent.durationMs ?? speechDisplayDurationMs);
+    if (externalIdleTimeoutRef.current !== null) window.clearTimeout(externalIdleTimeoutRef.current);
+    externalIdleTimeoutRef.current = resolvedEvent.durationMs
+      ? window.setTimeout(() => {
+          externalIdleTimeoutRef.current = null;
+          switchIdle();
+        }, resolvedEvent.durationMs)
+      : null;
+  }
+
   useEffect(() => {
     if (states.length === 0) {
       setActiveState("");
@@ -341,6 +369,8 @@ function PetView() {
     switchState(findIdleStateId(states));
     setSpeech(null);
     setSpeechDeadline(null);
+    if (externalIdleTimeoutRef.current !== null) window.clearTimeout(externalIdleTimeoutRef.current);
+    externalIdleTimeoutRef.current = null;
   }, [states]);
 
   useEffect(() => {
@@ -533,6 +563,10 @@ function PetView() {
         setPetScale(clampPetScale(command.value));
         return;
       }
+      if (command.type === "externalEvent") {
+        triggerExternalEvent(command.event);
+        return;
+      }
       if (command.type === "idle") {
         switchIdle();
       }
@@ -655,6 +689,7 @@ function SettingsView() {
   const [settingsMessage, setSettingsMessage] = useState("");
   const [platform, setPlatform] = useState<DesktopPlatform>(getFallbackDesktopPlatform);
   const [recoverySummary, setRecoverySummary] = useState<RecoverySummary | null>(null);
+  const [bridgeStatus, setBridgeStatus] = useState<ExternalAiBridgeStatus | null>(null);
 
   useEffect(() => {
     const getPlatform = window.aiPetsDesktop?.getPlatform;
@@ -667,6 +702,7 @@ function SettingsView() {
 
   useEffect(() => {
     void window.aiPetsDesktop?.getRecoverySummary().then(setRecoverySummary);
+    void window.aiPetsDesktop?.getExternalAiBridgeStatus().then(setBridgeStatus);
   }, []);
 
   useEffect(() => {
@@ -1100,6 +1136,20 @@ function SettingsView() {
                     </button>
                   ))}
               </div>
+            </div>
+
+            <div className="setting-card">
+              <h2>外部 AI 事件桥</h2>
+              <p className="muted">
+                {bridgeStatus?.running
+                  ? `正在监听 ${bridgeStatus.endpoint}`
+                  : `事件桥未运行${bridgeStatus?.lastError ? `：${bridgeStatus.lastError}` : "。"}`}
+              </p>
+              {bridgeStatus?.running && (
+                <pre className="bridge-command"><code>{`curl -X POST ${bridgeStatus.endpoint} \\
+  -H 'Content-Type: application/json' \\
+  -d '{"type":"pet.event","interactionId":"aiWorking","say":"正在处理任务...","source":"codex"}'`}</code></pre>
+              )}
             </div>
 
             <div className="setting-card">

@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const { createImportedPetTransaction, ImportedPetTransactionError } = require("./importedPets/transaction.ts");
+const { createExternalAiBridge } = require("./externalAiBridge.ts");
 const { createDesktopPreferencesStore, defaultPreferences } = require("../preferences.cjs");
 
 const isMac = process.platform === "darwin";
@@ -35,6 +36,13 @@ let importedPetTransaction;
 let recoverySummary;
 let preferencesStore;
 let desktopPreferences = { ...defaultPreferences };
+const pendingPetCommands: unknown[] = [];
+const MAX_PENDING_PET_COMMANDS = 30;
+const configuredBridgePort = Number(process.env.AI_PETS_EVENT_PORT ?? "17321");
+const externalAiBridge = createExternalAiBridge({
+  port: Number.isInteger(configuredBridgePort) && configuredBridgePort >= 1 && configuredBridgePort <= 65535 ? configuredBridgePort : 17321,
+  dispatch: (event) => dispatchPetCommand({ type: "externalEvent", event })
+});
 
 function getImportedPetErrorReason(error, fallback) {
   return error instanceof ImportedPetTransactionError && typeof error.reason === "string" ? error.reason : fallback;
@@ -79,6 +87,7 @@ function createPetWindow() {
       ...(isMac ? { backgroundThrottling: false } : {})
     }
   });
+  const createdWindow = petWindow;
 
   petWindow.once("ready-to-show", () => {
     if (petVisible) {
@@ -86,6 +95,14 @@ function createPetWindow() {
     }
     invalidatePetWindow();
     broadcastDesktopState();
+  });
+
+  createdWindow.webContents.on("did-finish-load", () => {
+    const commands = pendingPetCommands.splice(0);
+    for (const command of commands) {
+      createdWindow.webContents.send("desktop:pet-command", command);
+    }
+    if (commands.length > 0) invalidatePetWindow();
   });
 
   petWindow.on("show", () => {
@@ -377,7 +394,12 @@ function dispatchPetCommand(command) {
   if (!window.isVisible()) {
     window.show();
   }
-  window.webContents.send("desktop:pet-command", command);
+  if (window.webContents.isLoadingMainFrame()) {
+    pendingPetCommands.push(command);
+    if (pendingPetCommands.length > MAX_PENDING_PET_COMMANDS) pendingPetCommands.shift();
+  } else {
+    window.webContents.send("desktop:pet-command", command);
+  }
   invalidatePetWindow();
 }
 
@@ -567,6 +589,11 @@ ipcMain.handle("desktop:open-pet-quarantine-directory", async (event) => {
 
 ipcMain.handle("desktop:get-recovery-summary", () => recoverySummary ?? null);
 
+ipcMain.handle("desktop:get-external-ai-bridge-status", (event) => {
+  if (!isSettingsSender(event)) return { ...externalAiBridge.getStatus(), lastError: "仅设置窗口可以读取事件桥状态。" };
+  return externalAiBridge.getStatus();
+});
+
 ipcMain.handle("desktop:dispatch-pet-command", (_event, command) => {
   dispatchPetCommand(command);
 });
@@ -682,6 +709,7 @@ ipcMain.handle("desktop:control-settings-window", (event, action) => {
 app.on("before-quit", () => {
   app.isQuitting = true;
   void getImportedPetTransaction().cancelImport();
+  void externalAiBridge.stop();
   if (tray) {
     tray.destroy();
     tray = undefined;
@@ -699,6 +727,8 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
   registerImportedPetProtocol();
   createPetWindow();
   createTray();
+  const bridgeStatus = await externalAiBridge.start();
+  if (!bridgeStatus.running) console.error("外部 AI 事件桥启动失败。", bridgeStatus.lastError);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {

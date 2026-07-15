@@ -17,6 +17,24 @@ export interface DesktopPreferences {
   alwaysOnTop: boolean;
 }
 
+export interface ExternalPetEvent {
+  type: "pet.event";
+  interactionId?: string;
+  state?: string;
+  semanticRole?: string;
+  say?: string;
+  durationMs?: number;
+  source?: string;
+}
+
+export interface ExternalAiBridgeStatus {
+  running: boolean;
+  host: string;
+  port: number;
+  endpoint: string;
+  lastError?: string;
+}
+
 export type PetCommand =
   | { type: "selectPet"; selectedId: string }
   | { type: "state"; stateId: string }
@@ -24,6 +42,7 @@ export type PetCommand =
   | { type: "say"; message: string }
   | { type: "playbackSpeed"; value: number }
   | { type: "petScale"; value: number }
+  | { type: "externalEvent"; event: ExternalPetEvent }
   | { type: "idle" };
 
 export type ImportedPetErrorReason =
@@ -86,6 +105,7 @@ export interface DesktopApi {
   openPetDataDirectory(): Promise<OpenPetDataDirectoryResult>;
   openPetQuarantineDirectory(): Promise<OpenPetDataDirectoryResult>;
   getRecoverySummary(): Promise<RecoverySummary | null>;
+  getExternalAiBridgeStatus(): Promise<ExternalAiBridgeStatus>;
   showContextMenu(): Promise<void>;
   invalidatePetWindow(): Promise<void>;
   getPlatform(): Promise<DesktopPlatform>;
