@@ -178,7 +178,7 @@
     {
       "id": "mvp-desktop",
       "title": "桌面 MVP 阶段",
-      "description": "把 POC 能力推进到 Windows/macOS 桌面宠物应用，并建立外部 AI 应用事件桥。",
+      "description": "把 POC 能力推进到 Windows/macOS 桌面宠物应用，建立外部 AI 应用事件桥，并完成面向发布的收口（图标、签名、公证、自动更新、zip 导入、导入体验与透明渲染兼容）。",
       "status": "planned",
       "tasks": [
         {
@@ -228,23 +228,28 @@
         {
           "id": "mvp-desktop-shell",
           "title": "实现 Windows/macOS 独立桌面宠物壳",
-          "description": "提供透明置顶窗口、宠物包导入、本地设置和基础运行能力。",
-          "status": "planned",
+          "description": "提供透明置顶窗口、宠物包导入、双窗口设置面板、系统托盘控制和桌面端渲染运行时。已在打包产物中完成手动验收。",
+          "status": "completed",
           "priority": "high",
           "dependencies": [
             "poc-stabilization-baseline",
             "mvp-desktop-tech-choice"
           ],
           "deliverables": [
-            "透明置顶窗口",
-            "宠物包导入流程",
-            "本地设置",
-            "桌面端渲染运行时"
+            "透明置顶窗口（含 macOS 单 canvas 渲染兼容方案）",
+            "宠物包导入流程（Imported Pet 复制、索引与 ai-pets:// 协议）",
+            "双窗口设置面板（宠物窗口与独立设置窗口）",
+            "桌面端渲染运行时",
+            "系统托盘与宠物右键菜单控制",
+            "electron-builder 打包（Windows NSIS 与 macOS DMG/zip）"
           ],
           "acceptanceCriteria": [
             "桌面端消费 AI Pet Protocol 宠物包",
             "桌面端不依赖 Web POC 内部实现",
-            "Windows 和 macOS 方向都有明确打包方案"
+            "Windows 和 macOS 方向都有明确打包方案",
+            "Imported Pet 通过 ai-pets:// 协议加载，不向 renderer 暴露 file:// 路径",
+            "macOS 透明窗口切换动作时不出现明显残影",
+            "系统托盘与右键菜单共用同一套主进程控制逻辑"
           ],
           "phase": "mvp-desktop"
         },
@@ -268,6 +273,157 @@
             "外部应用能通过状态 id 驱动宠物",
             "外部应用能通过 semanticRole 驱动宠物",
             "事件桥不会要求外部应用理解渲染器内部实现"
+          ],
+          "phase": "mvp-desktop"
+        },
+        {
+          "id": "mvp-release-app-icon",
+          "title": "替换正式高清应用图标",
+          "description": "用 1024x1024 高清源图重新生成应用与安装包图标，替换当前来自 32x32 托盘图的临时图标。",
+          "status": "planned",
+          "priority": "low",
+          "dependencies": [
+            "mvp-desktop-shell"
+          ],
+          "deliverables": [
+            "1024x1024 高清图标源图",
+            "重新生成的 .icns 与 .ico",
+            "托盘与安装包图标同步"
+          ],
+          "acceptanceCriteria": [
+            "macOS Dock 与安装包内图标无模糊",
+            "托盘图标使用品牌图标"
+          ],
+          "phase": "mvp-desktop"
+        },
+        {
+          "id": "mvp-release-win-signing",
+          "title": "增加 Windows 代码签名",
+          "description": "为 Windows NSIS 安装包配置代码签名，减少安装时的未知发布者警告。",
+          "status": "planned",
+          "priority": "low",
+          "dependencies": [
+            "mvp-desktop-shell"
+          ],
+          "deliverables": [
+            "Windows 代码签名配置",
+            "签名后的 NSIS 安装包"
+          ],
+          "acceptanceCriteria": [
+            "安装包通过 Windows 签名校验"
+          ],
+          "phase": "mvp-desktop"
+        },
+        {
+          "id": "mvp-release-mac-notarize",
+          "title": "增加 macOS 签名与公证",
+          "description": "为 macOS 产物配置应用签名与 Apple 公证流程，通过 Gatekeeper 校验。",
+          "status": "planned",
+          "priority": "low",
+          "dependencies": [
+            "mvp-desktop-shell"
+          ],
+          "deliverables": [
+            "macOS 应用签名配置",
+            "Apple 公证（notarization）流程"
+          ],
+          "acceptanceCriteria": [
+            "打包 .app 通过 Gatekeeper 校验"
+          ],
+          "phase": "mvp-desktop"
+        },
+        {
+          "id": "mvp-release-auto-update",
+          "title": "设计自动更新策略",
+          "description": "设计桌面端自动更新方案，明确分发方式与对签名机制的前置依赖。",
+          "status": "planned",
+          "priority": "low",
+          "dependencies": [
+            "mvp-desktop-shell"
+          ],
+          "deliverables": [
+            "自动更新方案",
+            "更新分发 endpoint 策略"
+          ],
+          "acceptanceCriteria": [
+            "方案说明全量与增量更新取舍",
+            "方案说明对代码签名的前置依赖"
+          ],
+          "phase": "mvp-desktop"
+        },
+        {
+          "id": "mvp-release-zip-import",
+          "title": "支持 zip 宠物包导入",
+          "description": "在现有文件夹导入基础上支持 zip 宠物包，并补齐解压安全检查。",
+          "status": "planned",
+          "priority": "medium",
+          "dependencies": [
+            "mvp-desktop-shell"
+          ],
+          "deliverables": [
+            "zip 宠物包导入流程",
+            "路径穿越校验",
+            "解压体积与文件数上限"
+          ],
+          "acceptanceCriteria": [
+            "能导入 zip 宠物包并进入宠物列表",
+            "拒绝路径穿越与超限压缩包"
+          ],
+          "phase": "mvp-desktop"
+        },
+        {
+          "id": "mvp-release-reimport-overwrite",
+          "title": "增加 Imported Pet 重新导入覆盖入口",
+          "description": "为已导入宠物提供重新导入覆盖入口，覆盖前提示用户确认。",
+          "status": "planned",
+          "priority": "medium",
+          "dependencies": [
+            "mvp-desktop-shell"
+          ],
+          "deliverables": [
+            "重新导入覆盖入口",
+            "覆盖前确认提示"
+          ],
+          "acceptanceCriteria": [
+            "同 id 宠物可重新导入并覆盖",
+            "覆盖前提示用户确认"
+          ],
+          "phase": "mvp-desktop"
+        },
+        {
+          "id": "mvp-release-import-error-ui",
+          "title": "增加宠物包校验错误的细分 UI 展示",
+          "description": "把宠物包校验失败的具体原因分类展示，帮助用户定位问题字段。",
+          "status": "planned",
+          "priority": "low",
+          "dependencies": [
+            "mvp-desktop-shell"
+          ],
+          "deliverables": [
+            "校验错误分类展示",
+            "错误字段定位提示"
+          ],
+          "acceptanceCriteria": [
+            "校验失败时展示具体错误原因而非笼统提示"
+          ],
+          "phase": "mvp-desktop"
+        },
+        {
+          "id": "mvp-release-transparency-fallback",
+          "title": "处理 macOS 透明窗口残影",
+          "description": "采用单 canvas 绘制方案处理 macOS 透明窗口残影，并在打包产物中完成手动验收。若残影再次复现，可再评估原生 NSPanel/CALayer 或离屏渲染兜底方案。",
+          "status": "completed",
+          "priority": "low",
+          "dependencies": [
+            "mvp-desktop-shell"
+          ],
+          "deliverables": [
+            "单 canvas 绘制方案",
+            "macOS 透明合成兼容处理"
+          ],
+          "acceptanceCriteria": [
+            "单 canvas 绘制，macOS 禁用硬件加速并关闭 shadow 与 background throttling",
+            "切换动作与模拟 AI 事件时无透明残影"
           ],
           "phase": "mvp-desktop"
         }

@@ -1,11 +1,23 @@
 {
   "version": 1,
   "skills": {
+    "design-system": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/design-system/SKILL.md",
+      "computedHash": "a05715299135276628f53519484e1267ec8ad111e6355a09c2da1cf66aee2cc3"
+    },
     "react-dev": {
       "source": "softaworks/agent-toolkit",
       "sourceType": "github",
       "skillPath": "skills/react-dev/SKILL.md",
       "computedHash": "4ce3a30e2ad46fdb79f01e0e44701f961c055da7f25f9418af0283a7ad54b791"
+    },
+    "ui-designer": {
+      "source": "olehsvyrydov/ai-development-team",
+      "sourceType": "github",
+      "skillPath": "claude/skills/design/ui-designer/SKILL.md",
+      "computedHash": "7a2d4a27b8f479a72cb8c795cd9aa3fc18aa4ce40733e17c981faf006ff15b21"
     },
     "vitest": {
       "source": "antfu/skills",
