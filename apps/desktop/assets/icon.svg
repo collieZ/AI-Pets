@@ -1,38 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1254 1254">
   <defs>
-    <linearGradient id="surface" x1="120" y1="80" x2="880" y2="936" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#F7FCFF"/>
-      <stop offset="0.48" stop-color="#CDEBFA"/>
-      <stop offset="1" stop-color="#8EC9E9"/>
-    </linearGradient>
-    <linearGradient id="crystal" x1="286" y1="226" x2="744" y2="796" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFFFFF" stop-opacity="0.94"/>
-      <stop offset="0.46" stop-color="#E4F7FF" stop-opacity="0.82"/>
-      <stop offset="1" stop-color="#B9DFF2" stop-opacity="0.88"/>
-    </linearGradient>
-    <linearGradient id="facet" x1="386" y1="330" x2="676" y2="710" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#76B9DE"/>
-      <stop offset="1" stop-color="#426F92"/>
-    </linearGradient>
-    <filter id="shadow" x="80" y="70" width="864" height="900" filterUnits="userSpaceOnUse">
-      <feDropShadow dx="0" dy="30" stdDeviation="38" flood-color="#356B8D" flood-opacity="0.24"/>
-    </filter>
+    <clipPath id="app-icon-mask">
+      <rect x="14" y="14" width="1226" height="1226" rx="232"/>
+    </clipPath>
   </defs>
-  <rect x="56" y="56" width="912" height="912" rx="224" fill="url(#surface)"/>
-  <path d="M160 322C258 155 444 98 617 139c119 28 216 103 270 203-137-78-279-78-426-25-110 40-202 44-301 5Z" fill="#FFFFFF" fill-opacity="0.36"/>
-  <g filter="url(#shadow)">
-    <path d="m512 195 246 142 30 281-194 204H430L236 618l30-281 246-142Z" fill="url(#crystal)" stroke="#FFFFFF" stroke-width="20"/>
-    <path d="m512 195 82 244 164-102-246-142Z" fill="#FFFFFF" fill-opacity="0.5"/>
-    <path d="m266 337 164 102 82-244-246 142Z" fill="#D6F0FC" fill-opacity="0.56"/>
-    <path d="m236 618 194-179 164 0 194 179-194 204H430L236 618Z" fill="#B7DFF3" fill-opacity="0.38"/>
-  </g>
-  <g fill="url(#facet)">
-    <ellipse cx="408" cy="494" rx="45" ry="52"/>
-    <ellipse cx="616" cy="494" rx="45" ry="52"/>
-  </g>
-  <circle cx="393" cy="478" r="13" fill="#FFFFFF" fill-opacity="0.9"/>
-  <circle cx="601" cy="478" r="13" fill="#FFFFFF" fill-opacity="0.9"/>
-  <path d="M367 619c39 43 88 65 145 65s106-22 145-65" fill="none" stroke="#426F92" stroke-width="34" stroke-linecap="round"/>
-  <path d="m512 577-25 24h50l-25-24Z" fill="#6EAED2"/>
-  <path d="M203 750c71 100 181 160 309 160s238-60 309-160" fill="none" stroke="#FFFFFF" stroke-opacity="0.28" stroke-width="16" stroke-linecap="round"/>
+  <image
+    width="1254"
+    height="1254"
+    href="icon-source.png"
+    clip-path="url(#app-icon-mask)"
+    preserveAspectRatio="xMidYMid slice"
+  />
 </svg>
