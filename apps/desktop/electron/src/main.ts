@@ -1,10 +1,13 @@
-const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, protocol, Tray } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, protocol, shell, Tray } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
-const { createImportedPetStore, resolveImportedPetAssetPath } = require("./importedPets.cjs");
+const { createImportedPetTransaction, ImportedPetTransactionError } = require("./importedPets/transaction.ts");
+const { createDesktopPreferencesStore, defaultPreferences } = require("../preferences.cjs");
 
 const isMac = process.platform === "darwin";
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) app.quit();
 
 if (isMac) {
   app.disableHardwareAcceleration();
@@ -28,11 +31,21 @@ let tray;
 let settingsOpen = false;
 let petVisible = true;
 let alwaysOnTop = true;
-let importedPetStore;
-let pendingPetImport;
+let importedPetTransaction;
+let recoverySummary;
+let preferencesStore;
+let desktopPreferences = { ...defaultPreferences };
+
+function getImportedPetErrorReason(error, fallback) {
+  return error instanceof ImportedPetTransactionError && typeof error.reason === "string" ? error.reason : fallback;
+}
+
+function getResourcesPath() {
+  return "resourcesPath" in process ? process.resourcesPath : process.cwd();
+}
 
 function getAppEntry() {
-  return path.join(__dirname, "..", "dist", "index.html");
+  return path.join(__dirname, "..", "..", "dist", "index.html");
 }
 
 function loadAppView(window, view) {
@@ -68,8 +81,9 @@ function createPetWindow() {
   });
 
   petWindow.once("ready-to-show", () => {
-    petVisible = true;
-    petWindow.show();
+    if (petVisible) {
+      petWindow.show();
+    }
     invalidatePetWindow();
     broadcastDesktopState();
   });
@@ -105,7 +119,12 @@ function createSettingsWindow() {
     minHeight: 500,
     title: "AI-Pets 设置",
     show: false,
-    backgroundColor: "#f5f7fb",
+    frame: false,
+    resizable: true,
+    ...(isMac ? { trafficLightPosition: { x: 16, y: 14 } } : { thickFrame: true }),
+    transparent: true,
+    backgroundColor: "#00000000",
+    ...(isMac ? { vibrancy: "under-window", visualEffectState: "active" } : {}),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -113,6 +132,10 @@ function createSettingsWindow() {
       sandbox: true
     }
   });
+
+  if (isMac) {
+    settingsWindow.setWindowButtonVisibility(true);
+  }
 
   settingsWindow.once("ready-to-show", () => {
     if (settingsOpen) {
@@ -160,12 +183,60 @@ function getOrCreateSettingsWindow() {
   return settingsWindow && !settingsWindow.isDestroyed() ? settingsWindow : createSettingsWindow();
 }
 
-function getImportedPetStore() {
-  if (!importedPetStore) {
-    importedPetStore = createImportedPetStore({ userDataPath: app.getPath("userData") });
+function isSettingsSender(event) {
+  return BrowserWindow.fromWebContents(event.sender) === settingsWindow;
+}
+
+function getImportedPetTransaction() {
+  if (!importedPetTransaction) {
+    importedPetTransaction = createImportedPetTransaction({ userDataPath: app.getPath("userData") });
   }
 
-  return importedPetStore;
+  return importedPetTransaction;
+}
+
+function getPreferencesStore() {
+  if (!preferencesStore) {
+    preferencesStore = createDesktopPreferencesStore({ userDataPath: app.getPath("userData") });
+  }
+
+  return preferencesStore;
+}
+
+function loadDesktopPreferences() {
+  desktopPreferences = getPreferencesStore().read();
+  petVisible = desktopPreferences.petVisible;
+  alwaysOnTop = desktopPreferences.alwaysOnTop;
+}
+
+function updateDesktopPreferences(partialPreferences) {
+  desktopPreferences = {
+    ...desktopPreferences,
+    ...partialPreferences
+  };
+
+  try {
+    desktopPreferences = getPreferencesStore().write(desktopPreferences);
+  } catch (error) {
+    console.error("无法保存 AI-Pets 偏好设置。", error);
+  }
+}
+
+function resetDesktopPreferences() {
+  desktopPreferences = getPreferencesStore().write(defaultPreferences);
+  petVisible = desktopPreferences.petVisible;
+  alwaysOnTop = desktopPreferences.alwaysOnTop;
+
+  const window = getOrCreatePetWindow();
+  window.setAlwaysOnTop(alwaysOnTop);
+  if (petVisible) {
+    window.show();
+  } else {
+    window.hide();
+  }
+  updateTrayMenu();
+  broadcastDesktopState();
+  return desktopPreferences;
 }
 
 function getContentType(filePath) {
@@ -195,7 +266,7 @@ function createProtocolHeaders(contentType) {
 function registerImportedPetProtocol() {
   protocol.handle("ai-pets", async (request) => {
     try {
-      const filePath = resolveImportedPetAssetPath(getImportedPetStore().getImportedPetsRoot(), request.url);
+      const filePath = await getImportedPetTransaction().resolveAuthorizedAssetPath(request.url);
       const response = await net.fetch(pathToFileURL(filePath).toString());
       if (!response.ok) {
         return new Response("未找到导入宠物资源。", {
@@ -252,6 +323,7 @@ function setSettingsOpen(open) {
     window.show();
     window.focus();
   } else {
+    void getImportedPetTransaction().cancelImport();
     window.hide();
   }
   updateTrayMenu();
@@ -264,6 +336,7 @@ function toggleSettings() {
 
 function setPetVisible(visible) {
   petVisible = Boolean(visible);
+  updateDesktopPreferences({ petVisible });
   const window = getOrCreatePetWindow();
   if (petVisible) {
     window.show();
@@ -282,6 +355,7 @@ function togglePetVisible() {
 
 function setAlwaysOnTop(enabled) {
   alwaysOnTop = Boolean(enabled);
+  updateDesktopPreferences({ alwaysOnTop });
   const window = getOrCreatePetWindow();
   window.setAlwaysOnTop(alwaysOnTop);
   updateTrayMenu();
@@ -289,6 +363,16 @@ function setAlwaysOnTop(enabled) {
 }
 
 function dispatchPetCommand(command) {
+  if (command && typeof command === "object") {
+    if (command.type === "selectPet" && typeof command.selectedId === "string") {
+      updateDesktopPreferences({ selectedPetId: command.selectedId });
+    } else if (command.type === "playbackSpeed" && typeof command.value === "number") {
+      updateDesktopPreferences({ playbackSpeed: command.value });
+    } else if (command.type === "petScale" && typeof command.value === "number") {
+      updateDesktopPreferences({ petScale: command.value });
+    }
+  }
+
   const window = getOrCreatePetWindow();
   if (!window.isVisible()) {
     window.show();
@@ -303,42 +387,40 @@ function broadcastImportedPetsChanged() {
   }
 }
 
-async function importSelectedPetFolder(folderPath, options = {}) {
-  const result = await getImportedPetStore().importPetFolder(folderPath, options);
-  if (result.ok) {
-    pendingPetImport = undefined;
-    broadcastImportedPetsChanged();
-    return result;
-  }
-
-  if (result.reason === "already-exists") {
-    pendingPetImport = {
-      folderPath,
-      petId: result.petId
+async function preparePetImport(folderPath) {
+  try {
+    const preview = await getImportedPetTransaction().prepareImport(folderPath);
+    return {
+      ok: true,
+      preview
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: getImportedPetErrorReason(error, "invalid-package"),
+      message: error instanceof Error ? error.message : "宠物包校验失败。"
     };
   }
-
-  return result;
 }
 
 function getTrayIconPath() {
   const candidates = [
-    path.join(process.resourcesPath, "assets", "tray.ico"),
-    path.join(process.resourcesPath, "assets", "tray.png"),
-    path.join(__dirname, "..", "assets", "tray.ico"),
-    path.join(__dirname, "..", "assets", "tray.png")
+    path.join(getResourcesPath(), "assets", "tray.ico"),
+    path.join(getResourcesPath(), "assets", "tray.png"),
+    path.join(__dirname, "..", "..", "assets", "tray.ico"),
+    path.join(__dirname, "..", "..", "assets", "tray.png")
   ];
   return candidates.find((candidate) => fs.existsSync(candidate));
 }
 
 function getAppIconPath() {
   const candidates = [
-    path.join(process.resourcesPath, "assets", "icon.icns"),
-    path.join(process.resourcesPath, "assets", "icon.png"),
-    path.join(process.resourcesPath, "assets", "tray.png"),
-    path.join(__dirname, "..", "assets", "icon.icns"),
-    path.join(__dirname, "..", "assets", "icon.png"),
-    path.join(__dirname, "..", "assets", "tray.png")
+    path.join(getResourcesPath(), "assets", "icon.icns"),
+    path.join(getResourcesPath(), "assets", "icon.png"),
+    path.join(getResourcesPath(), "assets", "tray.png"),
+    path.join(__dirname, "..", "..", "assets", "icon.icns"),
+    path.join(__dirname, "..", "..", "assets", "icon.png"),
+    path.join(__dirname, "..", "..", "assets", "tray.png")
   ];
   return candidates.find((candidate) => fs.existsSync(candidate));
 }
@@ -463,16 +545,38 @@ ipcMain.handle("desktop:set-always-on-top", (_event, enabled) => {
 
 ipcMain.handle("desktop:get-state", () => getDesktopState());
 
+ipcMain.handle("desktop:get-preferences", () => desktopPreferences);
+
+ipcMain.handle("desktop:reset-preferences", () => resetDesktopPreferences());
+
+ipcMain.handle("desktop:open-pet-data-directory", async (event) => {
+  if (!isSettingsSender(event)) return { ok: false, message: "仅设置窗口可以打开宠物数据目录。" };
+  const root = getImportedPetTransaction().getImportedPetsRoot();
+  fs.mkdirSync(root, { recursive: true });
+  const errorMessage = await shell.openPath(root);
+  return errorMessage ? { ok: false, message: errorMessage } : { ok: true };
+});
+
+ipcMain.handle("desktop:open-pet-quarantine-directory", async (event) => {
+  if (!isSettingsSender(event)) return { ok: false, message: "仅设置窗口可以打开隔离目录。" };
+  const root = getImportedPetTransaction().getQuarantineRoot();
+  fs.mkdirSync(root, { recursive: true });
+  const errorMessage = await shell.openPath(root);
+  return errorMessage ? { ok: false, message: errorMessage } : { ok: true };
+});
+
+ipcMain.handle("desktop:get-recovery-summary", () => recoverySummary ?? null);
+
 ipcMain.handle("desktop:dispatch-pet-command", (_event, command) => {
   dispatchPetCommand(command);
 });
 
 ipcMain.handle("desktop:list-imported-pets", async () => {
-  const index = await getImportedPetStore().readIndex();
-  return index.pets;
+  return getImportedPetTransaction().listPets();
 });
 
 ipcMain.handle("desktop:select-import-pet-folder", async (event) => {
+  if (!isSettingsSender(event)) return { ok: false, reason: "unsafe-path", message: "仅设置窗口可以导入宠物。" };
   const parentWindow = BrowserWindow.fromWebContents(event.sender) ?? settingsWindow ?? petWindow;
   const dialogOptions = {
     title: "选择宠物包文件夹",
@@ -489,27 +593,49 @@ ipcMain.handle("desktop:select-import-pet-folder", async (event) => {
     };
   }
 
-  return importSelectedPetFolder(result.filePaths[0]);
+  return preparePetImport(result.filePaths[0]);
 });
 
-ipcMain.handle("desktop:confirm-import-pet-folder-overwrite", async (_event, petId) => {
-  if (!pendingPetImport || pendingPetImport.petId !== petId) {
+ipcMain.handle("desktop:confirm-import-pet-folder", async (event, token) => {
+  if (!isSettingsSender(event)) return { ok: false, reason: "unsafe-path", message: "仅设置窗口可以确认导入。" };
+  try {
+    const pet = await getImportedPetTransaction().confirmImport(token);
+    broadcastImportedPetsChanged();
+    return { ok: true, pet };
+  } catch (error) {
     return {
       ok: false,
-      reason: "no-pending-import"
+      reason: getImportedPetErrorReason(error, "transaction-failed"),
+      message: error instanceof Error ? error.message : "导入事务失败。"
     };
   }
-
-  return importSelectedPetFolder(pendingPetImport.folderPath, { overwrite: true });
 });
 
-ipcMain.handle("desktop:delete-imported-pet", async (_event, petId) => {
-  const result = await getImportedPetStore().deleteImportedPet(petId);
-  if (result.ok) {
-    broadcastImportedPetsChanged();
-  }
+ipcMain.handle("desktop:cancel-import-pet-folder", async (event, token) => {
+  if (!isSettingsSender(event)) return;
+  await getImportedPetTransaction().cancelImport(token);
+});
 
-  return result;
+ipcMain.handle("desktop:delete-imported-pet", async (event, petId) => {
+  if (!isSettingsSender(event)) return { ok: false, reason: "transaction-failed", petId, message: "仅设置窗口可以删除宠物。" };
+  try {
+    const result = await getImportedPetTransaction().deleteImportedPet(petId);
+    if (result.ok) {
+      if (desktopPreferences.selectedPetId === petId) {
+        updateDesktopPreferences({ selectedPetId: "yibao-codex" });
+        dispatchPetCommand({ type: "selectPet", selectedId: "yibao-codex" });
+      }
+      broadcastImportedPetsChanged();
+    }
+    return result;
+  } catch (error) {
+    return {
+      ok: false,
+      reason: getImportedPetErrorReason(error, "transaction-failed"),
+      petId,
+      message: error instanceof Error ? error.message : "删除宠物失败。"
+    };
+  }
 });
 
 ipcMain.handle("desktop:show-context-menu", (event) => {
@@ -530,17 +656,46 @@ ipcMain.handle("desktop:invalidate-pet-window", (event) => {
   invalidatePetWindow();
 });
 
+ipcMain.handle("desktop:control-settings-window", (event, action) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (window !== settingsWindow || !["minimize", "maximize", "close"].includes(action)) {
+    return;
+  }
+
+  if (action === "minimize") {
+    window.minimize();
+    return;
+  }
+
+  if (action === "maximize") {
+    if (window.isMaximized()) {
+      window.unmaximize();
+    } else {
+      window.maximize();
+    }
+    return;
+  }
+
+  setSettingsOpen(false);
+});
+
 app.on("before-quit", () => {
   app.isQuitting = true;
+  void getImportedPetTransaction().cancelImport();
   if (tray) {
     tray.destroy();
     tray = undefined;
   }
 });
 
-app.whenReady().then(() => {
+if (hasSingleInstanceLock) app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
+  loadDesktopPreferences();
   setMacDockIcon();
+  recoverySummary = await getImportedPetTransaction().initialize();
+  if (recoverySummary.quarantinedPetIds.includes(desktopPreferences.selectedPetId)) {
+    updateDesktopPreferences({ selectedPetId: "yibao-codex" });
+  }
   registerImportedPetProtocol();
   createPetWindow();
   createTray();
@@ -552,6 +707,11 @@ app.whenReady().then(() => {
       setPetVisible(true);
     }
   });
+});
+
+app.on("second-instance", () => {
+  setPetVisible(true);
+  if (settingsOpen) getOrCreateSettingsWindow().focus();
 });
 
 app.on("window-all-closed", () => {

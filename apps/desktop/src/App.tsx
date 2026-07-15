@@ -13,10 +13,17 @@ import {
 import { petCatalog, type PetCatalogItem } from "./petCatalog";
 import { mergePetCatalogs } from "./petCatalogModel";
 import { getSpriteViewportStyle } from "./spriteLayout";
+import type {
+  DesktopPlatform,
+  DesktopState,
+  PetCommand,
+  PetImportPreview,
+  RecoverySummary,
+  SettingsWindowAction
+} from "./desktopContracts";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 type SettingsTab = "basic" | "packages" | "testing";
-
 interface DragSnapshot {
   pointerId: number;
   startScreenX: number;
@@ -26,53 +33,9 @@ interface DragSnapshot {
   moved: boolean;
 }
 
-interface DesktopState {
-  settingsOpen: boolean;
-  petVisible: boolean;
-  alwaysOnTop: boolean;
-}
-
-type PetCommand =
-  | { type: "selectPet"; selectedId: string }
-  | { type: "state"; stateId: string }
-  | { type: "interaction"; interactionId: string }
-  | { type: "say"; message: string }
-  | { type: "playbackSpeed"; value: number }
-  | { type: "idle" };
-
-type ImportPetFolderResult =
-  | { ok: true; pet: PetCatalogItem }
-  | { ok: false; reason: "already-exists"; petId: string }
-  | { ok: false; reason: "cancelled" | "no-pending-import" };
-
-type DeleteImportedPetResult =
-  | { ok: true; petId: string }
-  | { ok: false; reason: "not-found"; petId: string };
-
-declare global {
-  interface Window {
-    aiPetsDesktop?: {
-      getWindowPosition(): Promise<{ x: number; y: number }>;
-      moveWindow(position: { x: number; y: number }): Promise<void>;
-      setSettingsOpen(open: boolean): Promise<void>;
-      setPetVisible(visible: boolean): Promise<void>;
-      setAlwaysOnTop(enabled: boolean): Promise<void>;
-      getDesktopState(): Promise<DesktopState>;
-      dispatchPetCommand(command: PetCommand): Promise<void>;
-      listImportedPets(): Promise<PetCatalogItem[]>;
-      selectImportPetFolder(): Promise<ImportPetFolderResult>;
-      confirmImportPetFolderOverwrite(petId: string): Promise<ImportPetFolderResult>;
-      deleteImportedPet(petId: string): Promise<DeleteImportedPetResult>;
-      showContextMenu(): Promise<void>;
-      invalidatePetWindow(): Promise<void>;
-      onDesktopState(callback: (state: DesktopState) => void): () => void;
-      onPetCommand(callback: (command: PetCommand) => void): () => void;
-      onImportedPetsChanged(callback: () => void): () => void;
-    };
-  }
-}
-
 const defaultMessage = "你好，我是 AI 宠物。";
+const speechDisplayDurationMs = 4200;
+const speechFadeDurationMs = 280;
 const defaultDesktopState: DesktopState = {
   settingsOpen: false,
   petVisible: true,
@@ -84,7 +47,9 @@ function getInitialPetId(catalog: PetCatalogItem[]) {
 }
 
 function joinAssetUrl(selected: PetCatalogItem, pkg: PetPackage) {
-  return `${selected.assetBaseUrl}${pkg.assets.atlas.path}`;
+  const baseUrl = new URL(selected.assetBaseUrl, window.location.href);
+  const encodedPath = pkg.assets.atlas.path.split("/").map(encodeURIComponent).join("/");
+  return new URL(encodedPath, baseUrl).toString();
 }
 
 function getValidationMessage(pkg: unknown) {
@@ -114,6 +79,14 @@ function findMovementState(states: RenderableState[], deltaX: number) {
 
 function clampPlaybackSpeed(value: number) {
   return Number.isFinite(value) ? Math.max(0.5, Math.min(1.5, value)) : 1;
+}
+
+function clampPetScale(value: number) {
+  return Number.isFinite(value) ? Math.max(0.65, Math.min(1.25, value)) : 1;
+}
+
+function getPetSourceLabel(sourceType: PetCatalogItem["sourceType"]) {
+  return sourceType === "codex-pet" ? "Codex 宠物协议" : "AI-Pets 宠物协议";
 }
 
 function drawRoundedRect(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
@@ -156,6 +129,17 @@ function wrapCanvasText(context: CanvasRenderingContext2D, text: string, maxWidt
 
 function getViewMode() {
   return new URLSearchParams(window.location.search).get("view") === "settings" ? "settings" : "pet";
+}
+
+function getFallbackDesktopPlatform(): DesktopPlatform {
+  const platform = navigator.platform;
+  if (/mac/i.test(platform)) {
+    return "darwin";
+  }
+  if (/linux/i.test(platform)) {
+    return "linux";
+  }
+  return "win32";
 }
 
 function usePetPackage(catalog: PetCatalogItem[], selectedId: string) {
@@ -258,9 +242,11 @@ function PetView() {
   const [selectedId, setSelectedId] = useState(() => getInitialPetId(catalog));
   const { selected, pkg, loadState, error, states } = usePetPackage(catalog, selectedId);
   const [activeState, setActiveState] = useState("");
-  const [message, setMessage] = useState(defaultMessage);
+  const [speech, setSpeech] = useState<string | null>(null);
+  const [speechDeadline, setSpeechDeadline] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [petScale, setPetScale] = useState(1);
   const [dragging, setDragging] = useState(false);
   const [loadedSpriteUrl, setLoadedSpriteUrl] = useState("");
   const petCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -270,6 +256,11 @@ function PetView() {
   const dragRef = useRef<DragSnapshot | null>(null);
   const lastPetWindowInvalidationRef = useRef(0);
   const lastPetWindowInvalidationKeyRef = useRef("");
+
+  const speechOpacity =
+    speech && speechDeadline
+      ? Math.max(0, Math.min(1, (speechDeadline - performance.now()) / speechFadeDurationMs))
+      : 0;
 
   const activeRenderableState = states.find((state) => state.id === activeState);
   const effectiveElapsed = elapsed * playbackSpeed;
@@ -298,6 +289,33 @@ function PetView() {
     switchState(findIdleStateId(states));
   }
 
+  function showSpeech(nextSpeech: string) {
+    const normalizedSpeech = nextSpeech.trim();
+    if (!normalizedSpeech) {
+      setSpeech(null);
+      setSpeechDeadline(null);
+      return;
+    }
+
+    setSpeech(normalizedSpeech);
+    setSpeechDeadline(performance.now() + speechDisplayDurationMs);
+  }
+
+  useEffect(() => {
+    const getPreferences = window.aiPetsDesktop?.getPreferences;
+    if (typeof getPreferences !== "function") {
+      return;
+    }
+
+    void getPreferences().then((preferences) => {
+      if (preferences.selectedPetId) {
+        setSelectedId(preferences.selectedPetId);
+      }
+      setPlaybackSpeed(clampPlaybackSpeed(preferences.playbackSpeed));
+      setPetScale(clampPetScale(preferences.petScale));
+    });
+  }, []);
+
   function triggerInteraction(interactionId: string) {
     if (!pkg) {
       return;
@@ -310,7 +328,7 @@ function PetView() {
 
     const say = pkg.interactions[interactionId]?.say;
     if (say) {
-      setMessage(say);
+      showSpeech(say);
     }
   }
 
@@ -321,8 +339,22 @@ function PetView() {
     }
 
     switchState(findIdleStateId(states));
-    setMessage(defaultMessage);
+    setSpeech(null);
+    setSpeechDeadline(null);
   }, [states]);
+
+  useEffect(() => {
+    if (!speech || !speechDeadline) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setSpeech(null);
+      setSpeechDeadline(null);
+    }, Math.max(0, speechDeadline - performance.now()));
+
+    return () => window.clearTimeout(timeout);
+  }, [speech, speechDeadline]);
 
   const spriteUrl = pkg && selected ? joinAssetUrl(selected, pkg) : "";
 
@@ -358,21 +390,15 @@ function PetView() {
     const image = spriteImageRef.current;
     const speechSlot = speechSlotRef.current;
     const spriteSlot = spriteSlotRef.current;
-    if (!canvas || !image || !speechSlot || !spriteSlot) {
+    if (!canvas || !image || !spriteSlot) {
       return;
     }
 
-    const { cellWidth, cellHeight } = pkg.assets.atlas;
     const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
     const canvasRect = canvas.getBoundingClientRect();
-    const speechRect = speechSlot.getBoundingClientRect();
     const slotRect = spriteSlot.getBoundingClientRect();
     const canvasWidth = Math.max(1, Math.round(canvasRect.width * pixelRatio));
     const canvasHeight = Math.max(1, Math.round(canvasRect.height * pixelRatio));
-    const speechX = speechRect.left - canvasRect.left;
-    const speechY = speechRect.top - canvasRect.top;
-    const speechWidth = speechRect.width;
-    const speechHeight = speechRect.height;
     const drawX = slotRect.left - canvasRect.left;
     const drawY = slotRect.top - canvasRect.top;
 
@@ -391,28 +417,49 @@ function PetView() {
     context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
     context.imageSmoothingEnabled = true;
 
-    context.save();
-    drawRoundedRect(context, speechX, speechY, speechWidth, speechHeight, 8);
-    context.fillStyle = "rgb(255 255 255 / 0.94)";
-    context.fill();
-    context.strokeStyle = "#d8e1ef";
-    context.lineWidth = 1;
-    context.stroke();
-    context.fillStyle = "#172033";
-    context.font = '20px "Microsoft YaHei", "PingFang SC", system-ui, sans-serif';
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    const lines = wrapCanvasText(context, message, speechWidth - 22);
-    const lineHeight = 24;
-    const firstLineY = speechY + speechHeight / 2 - ((lines.length - 1) * lineHeight) / 2;
-    lines.forEach((line, index) => {
-      context.fillText(line, speechX + speechWidth / 2, firstLineY + index * lineHeight);
-    });
-    context.restore();
+    if (speech && speechSlot && speechOpacity > 0) {
+      const speechRect = speechSlot.getBoundingClientRect();
+      const speechX = speechRect.left - canvasRect.left;
+      const speechY = speechRect.top - canvasRect.top;
+      const speechWidth = speechRect.width;
+      const speechHeight = speechRect.height;
+      const tailCenterX = speechX + speechWidth / 2;
 
-    context.drawImage(image, frame.x, frame.y, frame.width, frame.height, drawX, drawY, cellWidth, cellHeight);
+      context.save();
+      context.globalAlpha = speechOpacity;
+      context.shadowColor = "rgb(46 77 106 / 20%)";
+      context.shadowBlur = 18;
+      context.shadowOffsetY = 7;
+      context.beginPath();
+      context.moveTo(tailCenterX - 8, speechY + speechHeight - 1);
+      context.lineTo(tailCenterX, speechY + speechHeight + 7);
+      context.lineTo(tailCenterX + 8, speechY + speechHeight - 1);
+      context.closePath();
+      context.fillStyle = "rgb(243 250 255 / 88%)";
+      context.fill();
+      drawRoundedRect(context, speechX, speechY, speechWidth, speechHeight, 14);
+      context.fillStyle = "rgb(243 250 255 / 88%)";
+      context.fill();
+      context.shadowColor = "transparent";
+      context.strokeStyle = "rgb(255 255 255 / 92%)";
+      context.lineWidth = 1;
+      context.stroke();
+      context.fillStyle = "#36546c";
+      context.font = '600 15px "PingFang SC", "SF Pro Display", system-ui, sans-serif';
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      const lines = wrapCanvasText(context, speech, speechWidth - 24);
+      const lineHeight = 22;
+      const firstLineY = speechY + speechHeight / 2 - ((lines.length - 1) * lineHeight) / 2;
+      lines.forEach((line, index) => {
+        context.fillText(line, speechX + speechWidth / 2, firstLineY + index * lineHeight);
+      });
+      context.restore();
+    }
 
-    const invalidationKey = `${activeState}:${message}:${loadedSpriteUrl}`;
+    context.drawImage(image, frame.x, frame.y, frame.width, frame.height, drawX, drawY, slotRect.width, slotRect.height);
+
+    const invalidationKey = `${activeState}:${speech ?? ""}:${Math.round(speechOpacity * 10)}:${loadedSpriteUrl}`;
     const shouldForceInvalidation = lastPetWindowInvalidationKeyRef.current !== invalidationKey;
     const now = performance.now();
     if (shouldForceInvalidation || now - lastPetWindowInvalidationRef.current > 100) {
@@ -420,7 +467,7 @@ function PetView() {
       lastPetWindowInvalidationRef.current = now;
       void window.aiPetsDesktop?.invalidatePetWindow();
     }
-  }, [activeState, frame, loadedSpriteUrl, message, pkg, spriteUrl]);
+  }, [activeState, frame, loadedSpriteUrl, petScale, pkg, speech, speechOpacity, spriteUrl]);
 
   useEffect(() => {
     setElapsed(0);
@@ -475,11 +522,15 @@ function PetView() {
         return;
       }
       if (command.type === "say") {
-        setMessage(command.message);
+        showSpeech(command.message);
         return;
       }
       if (command.type === "playbackSpeed") {
         setPlaybackSpeed(clampPlaybackSpeed(command.value));
+        return;
+      }
+      if (command.type === "petScale") {
+        setPetScale(clampPetScale(command.value));
         return;
       }
       if (command.type === "idle") {
@@ -551,7 +602,7 @@ function PetView() {
 
   const spriteViewportStyle: CSSProperties | undefined =
     pkg && selected && frame
-      ? getSpriteViewportStyle(pkg.assets.atlas)
+      ? getSpriteViewportStyle(pkg.assets.atlas, petScale)
       : undefined;
 
   return (
@@ -562,7 +613,7 @@ function PetView() {
         )}
         {loadState === "ready" && pkg && frame && selected && (
           <div className="pet-shell">
-            <div className="speech-slot" ref={speechSlotRef} />
+            {speech && <div aria-hidden="true" className="speech-slot" ref={speechSlotRef}>{speech}</div>}
             <div
               aria-label={`${pkg.displayName} 当前状态：${activeRenderableState?.label ?? activeState}`}
               className={`sprite${dragRef.current ? " dragging" : ""}`}
@@ -596,9 +647,42 @@ function SettingsView() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("basic");
   const [message, setMessage] = useState(defaultMessage);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [petScale, setPetScale] = useState(1);
   const [importing, setImporting] = useState(false);
   const [importMessage, setImportMessage] = useState("");
   const [importError, setImportError] = useState("");
+  const [pendingImport, setPendingImport] = useState<PetImportPreview | null>(null);
+  const [settingsMessage, setSettingsMessage] = useState("");
+  const [platform, setPlatform] = useState<DesktopPlatform>(getFallbackDesktopPlatform);
+  const [recoverySummary, setRecoverySummary] = useState<RecoverySummary | null>(null);
+
+  useEffect(() => {
+    const getPlatform = window.aiPetsDesktop?.getPlatform;
+    if (typeof getPlatform !== "function") {
+      return;
+    }
+
+    void getPlatform().then(setPlatform);
+  }, []);
+
+  useEffect(() => {
+    void window.aiPetsDesktop?.getRecoverySummary().then(setRecoverySummary);
+  }, []);
+
+  useEffect(() => {
+    const getPreferences = window.aiPetsDesktop?.getPreferences;
+    if (typeof getPreferences !== "function") {
+      return;
+    }
+
+    void getPreferences().then((preferences) => {
+      if (preferences.selectedPetId) {
+        setSelectedId(preferences.selectedPetId);
+      }
+      setPlaybackSpeed(clampPlaybackSpeed(preferences.playbackSpeed));
+      setPetScale(clampPetScale(preferences.petScale));
+    });
+  }, []);
 
   function dispatch(command: PetCommand) {
     void window.aiPetsDesktop?.dispatchPetCommand(command);
@@ -615,6 +699,12 @@ function SettingsView() {
     dispatch({ type: "playbackSpeed", value: nextValue });
   }
 
+  function updatePetScale(value: number) {
+    const nextValue = clampPetScale(value);
+    setPetScale(nextValue);
+    dispatch({ type: "petScale", value: nextValue });
+  }
+
   async function importPetFolder() {
     if (!window.aiPetsDesktop || importing) {
       return;
@@ -623,12 +713,13 @@ function SettingsView() {
     setImporting(true);
     setImportMessage("");
     setImportError("");
+    setPendingImport(null);
 
     try {
       const result = await window.aiPetsDesktop.selectImportPetFolder();
       if (result.ok) {
-        selectPet(result.pet.id);
-        setImportMessage(`已导入：${result.pet.label}`);
+        setPendingImport(result.preview);
+        setImportMessage("宠物包已通过预检，请确认导入。");
         return;
       }
 
@@ -636,22 +727,8 @@ function SettingsView() {
         setImportMessage("已取消导入。");
         return;
       }
-
-      if (result.reason === "already-exists") {
-        const shouldOverwrite = window.confirm(`已存在同 id 宠物 ${result.petId}，是否覆盖？`);
-        if (!shouldOverwrite) {
-          setImportMessage("已保留原有宠物。");
-          return;
-        }
-
-        const overwriteResult = await window.aiPetsDesktop.confirmImportPetFolderOverwrite(result.petId);
-        if (overwriteResult.ok) {
-          selectPet(overwriteResult.pet.id);
-          setImportMessage(`已覆盖并导入：${overwriteResult.pet.label}`);
-          return;
-        }
-
-        setImportError("覆盖导入失败，请重新选择宠物文件夹。");
+      if (result.reason === "invalid-package") {
+        setImportError(`无法导入：${result.message ?? "宠物包校验失败。"}`);
         return;
       }
 
@@ -661,6 +738,68 @@ function SettingsView() {
     } finally {
       setImporting(false);
     }
+  }
+
+  async function confirmPetImport() {
+    if (!window.aiPetsDesktop || !pendingImport || importing) {
+      return;
+    }
+
+    setImporting(true);
+    setImportMessage("");
+    setImportError("");
+    try {
+      const result = await window.aiPetsDesktop.confirmImportPetFolder(pendingImport.token);
+      if (result.ok) {
+        selectPet(result.pet.id);
+        setImportMessage(`${pendingImport.alreadyExists ? "已覆盖并导入" : "已导入"}：${result.pet.label}`);
+        setPendingImport(null);
+        return;
+      }
+      setImportError(`无法导入：${result.message}`);
+    } catch (caught) {
+      setImportError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function cancelPetImport() {
+    const token = pendingImport?.token;
+    setPendingImport(null);
+    await window.aiPetsDesktop?.cancelImportPetFolder(token);
+    setImportMessage("已取消导入。");
+  }
+
+  async function resetSettings() {
+    if (!window.aiPetsDesktop || !window.confirm("恢复默认设置会重置当前宠物、缩放、播放速度、显示与置顶状态，是否继续？")) {
+      return;
+    }
+
+    const preferences = await window.aiPetsDesktop.resetPreferences();
+    const defaultPetId = getInitialPetId(petCatalog);
+    setSelectedId(defaultPetId);
+    setPlaybackSpeed(clampPlaybackSpeed(preferences.playbackSpeed));
+    setPetScale(clampPetScale(preferences.petScale));
+    setMessage(defaultMessage);
+    dispatch({ type: "selectPet", selectedId: defaultPetId });
+    dispatch({ type: "playbackSpeed", value: preferences.playbackSpeed });
+    dispatch({ type: "petScale", value: preferences.petScale });
+    setSettingsMessage("已恢复默认设置。");
+  }
+
+  async function openPetDataDirectory() {
+    if (!window.aiPetsDesktop) {
+      return;
+    }
+
+    const result = await window.aiPetsDesktop.openPetDataDirectory();
+    setSettingsMessage(result.ok ? "已打开宠物数据目录。" : `无法打开宠物数据目录：${result.message}`);
+  }
+
+  async function openPetQuarantineDirectory() {
+    const result = await window.aiPetsDesktop?.openPetQuarantineDirectory();
+    if (result && !result.ok) setImportError(`无法打开隔离目录：${result.message}`);
   }
 
   async function deleteImportedPet(pet: PetCatalogItem) {
@@ -687,7 +826,7 @@ function SettingsView() {
         return;
       }
 
-      setImportError("未找到要删除的导入宠物，列表已刷新。");
+      setImportError(result.reason === "not-found" ? "未找到要删除的导入宠物，列表已刷新。" : `删除失败：${result.message ?? "事务未完成。"}`);
     } catch (caught) {
       setImportError(caught instanceof Error ? caught.message : String(caught));
     }
@@ -700,35 +839,62 @@ function SettingsView() {
     protocolVersion: pkg?.protocolVersion ?? "无"
   };
 
+  function controlSettingsWindow(action: SettingsWindowAction) {
+    void window.aiPetsDesktop?.controlSettingsWindow(action);
+  }
+
   return (
     <main className="settings-app">
+      <header className={`window-titlebar${platform === "darwin" ? " window-titlebar--mac" : ""}`}>
+        <div className="window-titlebar__drag-region">
+          <span></span>
+        </div>
+        {platform !== "darwin" && <div className="window-controls" aria-label="窗口控制">
+          <button aria-label="最小化设置窗口" className="window-control window-control--minimize" onClick={() => controlSettingsWindow("minimize")} type="button">
+            <span aria-hidden="true" />
+          </button>
+          <button aria-label="最大化或还原设置窗口" className="window-control window-control--maximize" onClick={() => controlSettingsWindow("maximize")} type="button">
+            <span aria-hidden="true" />
+          </button>
+          <button aria-label="关闭设置窗口" className="window-control window-control--close" onClick={() => controlSettingsWindow("close")} type="button">
+            <span aria-hidden="true" />
+          </button>
+        </div>}
+      </header>
       <aside className="settings-sidebar">
         <div className="brand-block">
           <span className="brand-mark">AI</span>
           <div>
             <strong>AI-Pets</strong>
-            <p>桌面宠物设置</p>
+            <p>桌面陪伴控制台</p>
           </div>
         </div>
         <nav className="settings-tabs" aria-label="设置分类">
           <button className={activeTab === "basic" ? "active" : ""} onClick={() => setActiveTab("basic")} type="button">
-            基础设置
+            <span className="tab-icon" aria-hidden="true">◎</span>
+            <span><b>基础设置</b><small>显示与交互</small></span>
           </button>
           <button className={activeTab === "packages" ? "active" : ""} onClick={() => setActiveTab("packages")} type="button">
-            宠物包
+            <span className="tab-icon" aria-hidden="true">✦</span>
+            <span><b>宠物包</b><small>形象与资源</small></span>
           </button>
           <button className={activeTab === "testing" ? "active" : ""} onClick={() => setActiveTab("testing")} type="button">
-            测试工具
+            <span className="tab-icon" aria-hidden="true">⌁</span>
+            <span><b>测试工具</b><small>动作与事件</small></span>
           </button>
         </nav>
+        <div className="sidebar-footer">
+          <span>AI PETS</span>
+          <p>把一小段陪伴，放在桌面上。</p>
+        </div>
       </aside>
 
       <section className="settings-content">
         {activeTab === "basic" && (
           <section className="settings-page">
             <header className="page-header">
-              <p>General</p>
               <h1>基础设置</h1>
+              <span>调校桌面伙伴的显示和互动方式。</span>
             </header>
 
             <div className="setting-card split-card">
@@ -738,22 +904,37 @@ function SettingsView() {
               </div>
               <div className="switch-list">
                 <label className="switch-row">
-                  <span>显示宠物</span>
-                  <input
+                  <span><b>显示宠物</b><small>暂时隐藏或显示桌面伙伴</small></span>
+                  <input className="switch-input"
                     checked={desktopState.petVisible}
                     onChange={(event) => void window.aiPetsDesktop?.setPetVisible(event.target.checked)}
                     type="checkbox"
                   />
                 </label>
                 <label className="switch-row">
-                  <span>窗口置顶</span>
-                  <input
+                  <span><b>窗口置顶</b><small>始终停留在工作窗口上方</small></span>
+                  <input className="switch-input"
                     checked={desktopState.alwaysOnTop}
                     onChange={(event) => void window.aiPetsDesktop?.setAlwaysOnTop(event.target.checked)}
                     type="checkbox"
                   />
                 </label>
               </div>
+            </div>
+
+            <div className="setting-card">
+              <h2>宠物大小</h2>
+              <label className="field">
+                <span>{Math.round(petScale * 100)}%</span>
+                <input
+                  max="1.25"
+                  min="0.65"
+                  onChange={(event) => updatePetScale(Number(event.target.value))}
+                  step="0.05"
+                  type="range"
+                  value={petScale}
+                />
+              </label>
             </div>
 
             <div className="setting-card">
@@ -780,20 +961,43 @@ function SettingsView() {
                 </button>
               </div>
             </div>
+
+            <div className="setting-card">
+              <h2>数据与恢复</h2>
+              <p>导入的宠物与偏好设置保存在应用专属数据目录中，不会写入项目资源。</p>
+              <div className="row-actions">
+                <button onClick={() => void openPetDataDirectory()} type="button">打开宠物数据目录</button>
+                <button className="danger-button" onClick={() => void resetSettings()} type="button">恢复默认设置</button>
+              </div>
+              {settingsMessage && <p className="muted">{settingsMessage}</p>}
+            </div>
           </section>
         )}
 
         {activeTab === "packages" && (
           <section className="settings-page">
             <header className="page-header">
-              <p>Packages</p>
               <h1>宠物包</h1>
+              <span>管理内置形象与导入的自定义伙伴。</span>
             </header>
+
+            {recoverySummary && (recoverySummary.recoveredTransaction || recoverySummary.quarantinedPetIds.length > 0) && (
+              <div className="setting-card" role="status">
+                <h2>宠物库已自动修复</h2>
+                <p>
+                  {recoverySummary.recoveredTransaction ? "已回滚上次未完成的操作。" : ""}
+                  {recoverySummary.quarantinedPetIds.length > 0 ? ` 已隔离 ${recoverySummary.quarantinedPetIds.length} 个不安全或损坏的宠物包。` : ""}
+                </p>
+                {recoverySummary.quarantinedPetIds.length > 0 && (
+                  <button onClick={() => void openPetQuarantineDirectory()} type="button">打开隔离目录</button>
+                )}
+              </div>
+            )}
 
             <div className="setting-card">
               <h2>当前宠物</h2>
               <label className="field">
-                <span>选择内置宠物包</span>
+                <span>选择宠物包</span>
                 <select value={selectedId} onChange={(event) => selectPet(event.target.value)}>
                   {catalog.map((item) => (
                     <option key={item.id} value={item.id}>
@@ -803,15 +1007,39 @@ function SettingsView() {
                 </select>
               </label>
               {loadState === "error" && <p className="error-text">{error}</p>}
-              {loadState === "ready" && <p className="muted">已加载：{selected?.label}</p>}
+              {loadState === "ready" && pkg && selected && (
+                <p className="muted">
+                  已加载：{selected.label} · {getPetSourceLabel(selected.sourceType)} · {states.length} 个状态 · {pkg.assets.atlas.cellWidth} × {pkg.assets.atlas.cellHeight} px
+                </p>
+              )}
             </div>
 
             <div className="setting-card">
               <h2>导入宠物包</h2>
-              <p>选择一个包含 `manifest.json` 或 `pet.json` 的宠物文件夹。导入后会复制到应用管理目录，不依赖原始文件夹。</p>
+              <p>选择一个包含 `manifest.json` 或 `pet.json` 的宠物文件夹。导入前会校验协议、动画结构和 WebP/PNG 雪碧图，成功后复制到应用管理目录，不依赖原始文件夹。</p>
               <button disabled={importing} onClick={() => void importPetFolder()} type="button">
-                {importing ? "正在导入..." : "导入宠物文件夹"}
+                {importing ? "正在处理..." : "选择宠物文件夹"}
               </button>
+              {pendingImport && (
+                <div className="import-preview">
+                  <div>
+                    <strong>{pendingImport.label}</strong>
+                    <p>{pendingImport.alreadyExists ? "检测到同 id 宠物，确认后会覆盖现有副本。" : "预检通过，确认后将复制到应用管理目录。"}</p>
+                  </div>
+                  <dl>
+                    <div><dt>宠物 ID</dt><dd>{pendingImport.petId}</dd></div>
+                    <div><dt>协议</dt><dd>{getPetSourceLabel(pendingImport.sourceType)}</dd></div>
+                    <div><dt>动作数量</dt><dd>{pendingImport.actionCount}</dd></div>
+                    <div><dt>雪碧图</dt><dd>{pendingImport.assetPath}</dd></div>
+                  </dl>
+                  <div className="row-actions">
+                    <button onClick={() => void cancelPetImport()} type="button">取消</button>
+                    <button disabled={importing} onClick={() => void confirmPetImport()} type="button">
+                      {pendingImport.alreadyExists ? "覆盖并导入" : "确认导入"}
+                    </button>
+                  </div>
+                </div>
+              )}
               {importMessage && <p className="muted">{importMessage}</p>}
               {importError && <p className="error-text">{importError}</p>}
             </div>
@@ -847,8 +1075,8 @@ function SettingsView() {
         {activeTab === "testing" && (
           <section className="settings-page">
             <header className="page-header">
-              <p>Tools</p>
               <h1>测试工具</h1>
+              <span>快速检查宠物状态、动作和 AI 事件反馈。</span>
             </header>
 
             <div className="setting-card">

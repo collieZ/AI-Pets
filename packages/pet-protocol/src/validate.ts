@@ -1,4 +1,4 @@
-import type { ValidationIssue, ValidationResult } from "./types";
+import type { ValidationIssue, ValidationResult } from "./types.js";
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -14,6 +14,11 @@ const isNonNegativeInteger = (value: unknown): value is number =>
 
 const isPositiveNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value > 0;
+
+const isSafeRelativeAssetPath = (value: string) => {
+  const normalized = value.replaceAll("\\", "/");
+  return !normalized.startsWith("/") && !normalized.split("/").some((segment) => segment === ".." || segment === "");
+};
 
 export function validatePetPackage(pkg: unknown): ValidationResult {
   const issues: ValidationIssue[] = [];
@@ -43,6 +48,8 @@ export function validatePetPackage(pkg: unknown): ValidationResult {
 
     if (!isNonEmptyString(atlas.path)) {
       issues.push({ path: "assets.atlas.path", message: "atlas.path 必须是非空字符串。" });
+    } else if (!isSafeRelativeAssetPath(atlas.path)) {
+      issues.push({ path: "assets.atlas.path", message: "atlas.path 必须是安全的相对路径。" });
     }
 
     for (const field of ["cellWidth", "cellHeight", "columns", "rows"] as const) {
@@ -81,10 +88,25 @@ export function validatePetPackage(pkg: unknown): ValidationResult {
         });
       }
 
+      if (isNonNegativeInteger(animation.row) && isObject(atlas) && isPositiveInteger(atlas.rows) && animation.row >= atlas.rows) {
+        issues.push({
+          path: `animationSets.default.animations.${animationId}.row`,
+          message: "row 不能超出 atlas.rows。"
+        });
+      }
+
       if (!isPositiveInteger(animation.frames)) {
         issues.push({
           path: `animationSets.default.animations.${animationId}.frames`,
           message: "frames 必须是大于 0 的整数。"
+        });
+      }
+
+
+      if (isPositiveInteger(animation.frames) && isObject(atlas) && isPositiveInteger(atlas.columns) && animation.frames > atlas.columns) {
+        issues.push({
+          path: `animationSets.default.animations.${animationId}.frames`,
+          message: "frames 不能超出 atlas.columns。"
         });
       }
 
@@ -99,10 +121,26 @@ export function validatePetPackage(pkg: unknown): ValidationResult {
 
   if (!isObject(pkg.interactions)) {
     issues.push({ path: "interactions", message: "interactions 必须是对象。" });
+  } else {
+    for (const [interactionId, interaction] of Object.entries(pkg.interactions)) {
+      if (!isObject(interaction)) {
+        issues.push({ path: `interactions.${interactionId}`, message: "交互定义必须是对象。" });
+        continue;
+      }
+      if (interaction.state !== undefined && (!isNonEmptyString(interaction.state) || !isObject(states) || !Object.hasOwn(states, interaction.state))) {
+        issues.push({ path: `interactions.${interactionId}.state`, message: "交互引用的状态不存在。" });
+      }
+    }
   }
 
   if (!isObject(pkg.capabilities)) {
     issues.push({ path: "capabilities", message: "capabilities 必须是对象。" });
+  } else {
+    for (const [capabilityId, enabled] of Object.entries(pkg.capabilities)) {
+      if (typeof enabled !== "boolean") {
+        issues.push({ path: `capabilities.${capabilityId}`, message: "capability 值必须是布尔值。" });
+      }
+    }
   }
 
   if (isObject(states)) {
@@ -114,6 +152,11 @@ export function validatePetPackage(pkg: unknown): ValidationResult {
 
       if (!isNonEmptyString(state.label)) {
         issues.push({ path: `states.${stateId}.label`, message: "状态必须有 label。" });
+      }
+
+
+      if (typeof state.loop !== "boolean") {
+        issues.push({ path: `states.${stateId}.loop`, message: "loop 必须是布尔值。" });
       }
 
       if (isObject(animations) && (!isNonEmptyString(state.animation) || !Object.hasOwn(animations, state.animation))) {

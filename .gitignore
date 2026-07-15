@@ -4,4 +4,5 @@ dist/
 .vite/
 .tmp/
 release/
+apps/desktop/electron/generated/
 *.log

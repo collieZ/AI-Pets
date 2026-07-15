@@ -8,9 +8,9 @@ export interface SpriteViewportStyle {
   height: number;
 }
 
-export function getSpriteViewportStyle(atlas: AtlasSize): SpriteViewportStyle {
+export function getSpriteViewportStyle(atlas: AtlasSize, scale = 1): SpriteViewportStyle {
   return {
-    width: atlas.cellWidth,
-    height: atlas.cellHeight
+    width: Math.round(atlas.cellWidth * scale),
+    height: Math.round(atlas.cellHeight * scale)
   };
 }

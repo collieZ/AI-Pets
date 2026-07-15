@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { CODEX_ANIMATION_ROWS } from "../packages/codex-pet-adapter/src/codexStates.js";
 import { getAnimationDurationMs, getFrameAtTime } from "../packages/pet-renderer/src/frameMath.js";
+import { validatePetPackage } from "../packages/pet-protocol/src/validate.js";
 
 const atlas = {
   path: "spritesheet.webp",
@@ -34,4 +35,25 @@ test("Codex preset uses a calmer default playback cadence", () => {
   assert.equal(CODEX_ANIMATION_ROWS.idle.fps, 5);
   assert.equal(CODEX_ANIMATION_ROWS["running-right"].fps, 7);
   assert.equal(CODEX_ANIMATION_ROWS.running.fps, 5);
+});
+
+test("pet package validation rejects unsafe assets and out-of-atlas animations", () => {
+  const result = validatePetPackage({
+    protocolVersion: "0.1.0",
+    petId: "unsafe",
+    displayName: "不安全宠物",
+    description: "测试",
+    assets: { atlas: { ...atlas, path: "../outside.webp", rows: 1 } },
+    states: { idle: { label: "待机", animation: "idle", loop: true } },
+    animationSets: { default: { animations: { idle: { row: 1, frames: 9, fps: 4 } } } },
+    interactions: { click: { state: "missing" } },
+    capabilities: { drag: "yes" }
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.issues.some((issue) => issue.path === "assets.atlas.path"), true);
+  assert.equal(result.issues.some((issue) => issue.path.endsWith(".row")), true);
+  assert.equal(result.issues.some((issue) => issue.path.endsWith(".frames")), true);
+  assert.equal(result.issues.some((issue) => issue.path === "interactions.click.state"), true);
+  assert.equal(result.issues.some((issue) => issue.path === "capabilities.drag"), true);
 });

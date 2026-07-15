@@ -6,11 +6,12 @@
   "productName": "AI-Pets",
   "author": "AI-Pets",
   "type": "module",
-  "main": "electron/main.cjs",
+  "main": "electron/generated/main.cjs",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5174",
-    "build": "vite build",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build:electron": "node electron/build.mjs",
+    "build": "pnpm build:electron && vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p electron/tsconfig.json --noEmit",
     "electron:dev": "pnpm build && electron .",
     "pack:dir": "pnpm build && electron-builder --dir",
     "dist": "pnpm build && electron-builder",
@@ -28,7 +29,7 @@
     },
     "files": [
       "dist/**",
-      "electron/**",
+      "electron/generated/**",
       "package.json",
       "assets/**"
     ],

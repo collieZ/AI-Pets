@@ -1,6 +1,6 @@
 import type { AnimationDefinition, PetPackage, PetStateDefinition } from "@ai-pets/pet-protocol";
 import { validatePetPackage } from "@ai-pets/pet-protocol";
-import { CODEX_ANIMATION_ROWS, CODEX_STATE_PRESETS } from "./codexStates";
+import { CODEX_ANIMATION_ROWS, CODEX_STATE_PRESETS } from "./codexStates.js";
 
 export interface CodexPetManifest {
   id: string;
@@ -163,4 +163,4 @@ export function adaptCodexPet(rawManifest: unknown): PetPackage {
   return pkg;
 }
 
-export { CODEX_ANIMATION_ROWS, CODEX_STATE_PRESETS } from "./codexStates";
+export { CODEX_ANIMATION_ROWS, CODEX_STATE_PRESETS } from "./codexStates.js";

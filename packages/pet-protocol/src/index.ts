@@ -8,5 +8,5 @@ export type {
   SemanticRole,
   ValidationIssue,
   ValidationResult
-} from "./types";
-export { validatePetPackage } from "./validate";
+} from "./types.js";
+export { validatePetPackage } from "./validate.js";
