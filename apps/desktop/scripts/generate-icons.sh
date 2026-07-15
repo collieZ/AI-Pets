@@ -8,8 +8,11 @@ ICONSET_DIR="$ASSET_DIR/icon.iconset"
 TEMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TEMP_DIR" "$ICONSET_DIR"' EXIT
 
-qlmanage -t -s 1024 -o "$TEMP_DIR" "$ASSET_DIR/icon.svg" >/dev/null 2>&1
-mv "$TEMP_DIR/icon.svg.png" "$ASSET_DIR/icon.png"
+ffmpeg -hide_banner -loglevel error -y \
+  -i "$ASSET_DIR/icon-source.png" \
+  -vf "scale=1080:1080,crop=1024:1024,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='clip((260-hypot(max(260-X,0)+max(X-763,0),max(260-Y,0)+max(Y-763,0)))*255+128,0,255)'" \
+  -frames:v 1 \
+  "$ASSET_DIR/icon.png"
 rm -rf "$ICONSET_DIR"
 mkdir -p "$ICONSET_DIR"
 
